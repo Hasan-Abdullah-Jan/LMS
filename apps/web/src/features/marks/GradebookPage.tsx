@@ -1,0 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, Download, FileSpreadsheet } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { api, downloadFile } from '../../lib/api';
+
+interface Book{students:Array<{id:string;fullName:string;email:string}>;items:Array<{id:string;title:string;kind:string;max:number|null}>;marks:Array<{studentId:string;itemId:string;obtained:number;max:number}>;meta:{page:number;pageSize:number;total:number}}
+export default function GradebookPage(){
+ const {id=''}=useParams();const q=useQuery({queryKey:['gradebook',id],queryFn:()=>api<{data:Book}>(`/courses/${id}/gradebook?page=1&pageSize=100`)});
+ const book=q.data?.data;
+ return <div className="learning-page"><Link className="back-link" to={`/courses/${id}/assignments`}><ArrowLeft size={15}/> Back to assignments</Link><div className="learning-heading"><div><span className="eyebrow">TEACHER WORKSPACE</span><h1>Gradebook</h1><p>Marks for the learners in your course.</p></div><button className="button button-outline" onClick={()=>void downloadFile(`/courses/${id}/gradebook.csv`)}><Download size={15}/> Export CSV</button></div>{q.isLoading?<div className="table-state">Loading gradebook…</div>:q.isError?<div className="table-state error-state">Couldn’t load gradebook. <button onClick={()=>void q.refetch()}>Try again</button></div>:!book?.students.length?<div className="surface-card learning-empty"><FileSpreadsheet size={24}/><strong>No enrolled learners</strong><span>Students appear here after you enroll them.</span></div>:<section className="surface-card gradebook-card"><div className="table-scroll"><table><thead><tr><th className="sticky-col">Student</th>{book.items.map(i=><th key={i.id}>{i.title}<small>{i.kind}</small></th>)}<th>Total</th></tr></thead><tbody>{book.students.map(s=>{const marks=book.items.map(i=>book.marks.find(m=>m.studentId===s.id&&m.itemId===i.id));const got=marks.reduce((n,m)=>n+Number(m?.obtained??0),0);const max=marks.reduce((n,m)=>n+Number(m?.max??0),0);return <tr key={s.id}><td className="sticky-col"><strong>{s.fullName}</strong><small>{s.email}</small></td>{marks.map((m,i)=><td key={book.items[i]?.id}>{m?m.obtained:<span className="pending-cell">Pending</span>}{m&&<small> / {m.max}</small>}</td>)}<td><strong>{got}</strong>{max>0&&<small> / {max}</small>}</td></tr>})}</tbody></table></div><footer>{book.meta.total} enrolled learners · Pending grades aren’t included in totals.</footer></section>}</div>
+}
+

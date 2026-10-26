@@ -1,0 +1,17 @@
+import { Router } from 'express';
+import multer from 'multer';
+import { z } from 'zod';
+import { asyncHandler } from '../../middleware/async-handler.js';
+import { requireAuth,requireRole } from '../../middleware/auth.js';
+import { HttpError } from '../../middleware/errors.js';
+import { complaintAdminQuerySchema,complaintCreateSchema,complaintPageSchema,complaintReadSchema,complaintUpdateSchema } from './complaints.schemas.js';
+import { complaintAttachment,createComplaint,listAdmin,listMine,markComplaintRead,unreadComplaintCount,updateComplaint } from './complaints.service.js';
+const router=Router();const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:10*1024*1024}});const user=(r:import('express').Request)=>({id:r.user!.id,role:r.user!.role,accessToken:r.user!.accessToken});
+router.post('/complaints',requireAuth,requireRole('student','teacher'),upload.single('file'),asyncHandler(async(req,res)=>{const b=complaintCreateSchema.safeParse(req.body);if(!b.success)throw new HttpError(422,'VALIDATION_ERROR','Complete the complaint details');res.status(201).json({data:await createComplaint(user(req),b.data,req.file)});}));
+router.get('/complaints/mine',requireAuth,requireRole('student','teacher'),asyncHandler(async(req,res)=>{const q=complaintPageSchema.safeParse(req.query);if(!q.success)throw new HttpError(422,'VALIDATION_ERROR','Invalid pagination');res.json(await listMine(user(req),q.data.page,q.data.pageSize));}));
+router.get('/complaints/unread-count',requireAuth,requireRole('student','teacher'),asyncHandler(async(req,res)=>res.json({data:{unreadCount:await unreadComplaintCount(user(req))}})));
+router.post('/complaints/read',requireAuth,requireRole('student','teacher'),asyncHandler(async(req,res)=>{const b=complaintReadSchema.safeParse(req.body);if(!b.success)throw new HttpError(422,'VALIDATION_ERROR','Invalid complaint');res.json({data:await markComplaintRead(user(req),b.data.complaintId)});}));
+router.get('/complaints/:id/attachment',requireAuth,asyncHandler(async(req,res)=>{const id=z.string().uuid().safeParse(req.params.id);if(!id.success)throw new HttpError(404,'NOT_FOUND','Complaint not found');res.json({data:await complaintAttachment(user(req),id.data)});}));
+router.get('/admin/complaints',requireAuth,requireRole('admin'),asyncHandler(async(req,res)=>{const q=complaintAdminQuerySchema.safeParse(req.query);if(!q.success)throw new HttpError(422,'VALIDATION_ERROR','Invalid filters');res.json(await listAdmin(q.data.page,q.data.pageSize,q.data.status,q.data.category));}));
+router.patch('/admin/complaints/:id',requireAuth,requireRole('admin'),asyncHandler(async(req,res)=>{const id=z.string().uuid().safeParse(req.params.id),b=complaintUpdateSchema.safeParse(req.body);if(!id.success)throw new HttpError(404,'NOT_FOUND','Complaint not found');if(!b.success)throw new HttpError(422,'VALIDATION_ERROR',b.error.issues[0]?.message??'Invalid update');res.json({data:await updateComplaint(user(req),id.data,b.data)});}));
+export default router;
