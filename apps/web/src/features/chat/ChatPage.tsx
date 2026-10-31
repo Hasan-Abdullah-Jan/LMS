@@ -463,8 +463,11 @@ export function ChatPage() {
                   c.id === courseId && 'bg-muted',
                 )}
               >
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                  {c.code.slice(0, 4)}
+                <div
+                  className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                  aria-hidden
+                >
+                  <MessagesSquare className="size-4" />
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{c.code}</p>

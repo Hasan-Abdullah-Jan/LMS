@@ -138,7 +138,9 @@ export function MyMarksPage() {
                       <TableRow className="bg-muted/40 font-semibold hover:bg-muted/40">
                         <TableCell colSpan={3}>Total (graded items)</TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {formatMarks(totals.obtained)} / {formatMarks(totals.max)}
+                          {totals.max > 0
+                            ? `${formatMarks(totals.obtained)} / ${formatMarks(totals.max)}`
+                            : '—'}
                         </TableCell>
                       </TableRow>
                     </TableBody>

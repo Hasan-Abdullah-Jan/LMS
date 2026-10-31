@@ -33,10 +33,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 /** Single-flight so React StrictMode's double effect never spends the refresh token twice. */
 let bootRefresh: Promise<SessionPayload<Profile> | null> | null = null;
+/** Resolves to null when there is no valid session (204 without a cookie, 401 if expired). */
 const fetchSession = () =>
-  getData<SessionPayload<Profile>>('/auth/refresh', { method: 'POST', skipRefresh: true }).catch(
-    () => null,
-  );
+  request<{ data: SessionPayload<Profile> } | undefined>('/auth/refresh', {
+    method: 'POST',
+    skipRefresh: true,
+  })
+    .then((body) => body?.data ?? null)
+    .catch(() => null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();

@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_API_URL: /api
+
+  acceptance:
+    name: Integration + E2E (local Supabase)
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start Supabase (migrations + seed)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta
+      - name: Write .env files from the local stack
+        run: |
+          eval "$(supabase status -o env)"
+          cat > apps/api/.env <<EOT
+          PORT=4000
+          NODE_ENV=development
+          CLIENT_ORIGIN=http://localhost:5173
+          SUPABASE_URL=$API_URL
+          SUPABASE_ANON_KEY=$ANON_KEY
+          SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
+          PASSWORD_RESET_REDIRECT=http://localhost:5173/reset-password
+          LOG_LEVEL=warn
+          EOT
+          cat > apps/web/.env <<EOT
+          VITE_API_URL=/api
+          VITE_SUPABASE_URL=$API_URL
+          VITE_SUPABASE_ANON_KEY=$ANON_KEY
+          EOT
+      - name: API integration acceptance suite
+        run: npm run test:integration
+      - name: Reset data for E2E
+        run: supabase db reset
+      - run: npx playwright install --with-deps chromium
+      - name: Start API and web
+        run: |
+          npm run dev > dev.log 2>&1 &
+          npx wait-on -t 120000 http://localhost:4000/api/health http://localhost:5173
+      - name: Playwright E2E (one flow per role)
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            dev.log

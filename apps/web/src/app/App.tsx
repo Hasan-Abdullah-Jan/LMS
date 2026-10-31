@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { PageLoader } from '@/components/common/states';
 import { TooltipProvider } from '@/components/ui/misc';
-import { AuthProvider } from '@/features/auth/AuthProvider';
+import { AuthProvider, useAuth } from '@/features/auth/AuthProvider';
 import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
 import { HomeRedirect, PublicOnly, RequireAuth, RequireRole } from '@/features/auth/guards';
@@ -172,15 +172,21 @@ const router = createBrowserRouter([
               { path: '/admin/audit', element: suspense(<AuditLogPage />) },
             ],
           },
-          { path: '*', element: <NotFoundPage /> },
         ],
       },
     ],
   },
   { path: '/dashboard', element: <Navigate to="/" replace /> },
   // Everything else (including /signup) is a 404 - there is no public sign-up.
-  { path: '*', element: <NotFoundPage /> },
+  { element: <CatchAllLayout />, children: [{ path: '*', element: <NotFoundPage /> }] },
 ]);
+
+/** 404s keep the app shell for signed-in users and stay public otherwise. */
+function CatchAllLayout() {
+  const { status, user } = useAuth();
+  if (status === 'loading') return <PageLoader />;
+  return user ? <AppLayout /> : <Outlet />;
+}
 
 export function App() {
   return (

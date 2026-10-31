@@ -10,7 +10,12 @@ export default defineConfig({
     port: 5173,
     host: true,
     // Same-origin API in development: /api/* is forwarded to the Express server.
-    proxy: { '/api': { target: process.env.VITE_DEV_API_PROXY ?? 'http://localhost:4000', changeOrigin: false } },
+    proxy: {
+      '/api': {
+        target: process.env.VITE_DEV_API_PROXY ?? 'http://localhost:4000',
+        changeOrigin: false,
+      },
+    },
   },
   preview: { port: 4173 },
   build: {

@@ -13,15 +13,17 @@ export const realtimeEnabled = Boolean(url && anonKey);
 
 export const supabase: SupabaseClient | null = realtimeEnabled
   ? createClient(url!, anonKey!, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      // The session lives in the API's auth flow, not in supabase-js. Realtime asks
+      // this callback for a token on every (re)join and heartbeat, so it always
+      // uses the current user's JWT (falling back to the anon key when signed out).
+      accessToken: async () => tokenStore.get() ?? anonKey!,
       realtime: { params: { eventsPerSecond: 10 } },
     })
   : null;
 
 if (supabase) {
-  const apply = (token: string | null) => {
-    void supabase.realtime.setAuth(token ?? anonKey!);
-  };
-  apply(tokenStore.get());
-  tokenStore.subscribe(apply);
+  // Push a fresh token to open channels whenever the session changes or refreshes.
+  tokenStore.subscribe(() => {
+    void supabase.realtime.setAuth();
+  });
 }

@@ -45,10 +45,9 @@ export const authController = {
   async refresh(req: Request, res: Response) {
     const token: unknown = req.cookies?.[REFRESH_COOKIE];
     if (typeof token !== 'string' || !token) {
+      // No session cookie: nothing to refresh (not an error for a signed-out visitor).
       clearSession(res);
-      res
-        .status(401)
-        .json({ error: { code: 'UNAUTHORIZED', message: 'Please sign in to continue.' } });
+      sendNoContent(res);
       return;
     }
     try {

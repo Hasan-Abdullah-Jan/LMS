@@ -142,7 +142,9 @@ export function GradebookTab() {
                     );
                   })}
                   <td className="border-b px-3 py-2.5 text-center font-semibold tabular-nums group-hover:bg-muted/40">
-                    {formatMarks(row.totals.obtained)} / {formatMarks(row.totals.max)}
+                    {row.totals.max > 0
+                      ? `${formatMarks(row.totals.obtained)} / ${formatMarks(row.totals.max)}`
+                      : '—'}
                   </td>
                   <td className="border-b px-3 py-2.5 text-center font-semibold tabular-nums group-hover:bg-muted/40">
                     {row.totals.percentage === null ? '—' : `${row.totals.percentage}%`}
