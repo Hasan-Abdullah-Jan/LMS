@@ -26,9 +26,19 @@ export const appRoutes = Router()
   .get('/courses/:id', courses.get)
   .get('/courses/:id/members', courses.members)
   .get('/courses/:id/resources', courses.listResources)
-  .post('/courses/:id/resources', staff, singleFile('file', MAX_RESOURCE_BYTES), courses.uploadResource)
+  .post(
+    '/courses/:id/resources',
+    staff,
+    singleFile('file', MAX_RESOURCE_BYTES),
+    courses.uploadResource,
+  )
   .get('/courses/:id/assignments', courses.listAssignments)
-  .post('/courses/:id/assignments', staff, singleFile('attachment', MAX_RESOURCE_BYTES), courses.createAssignment)
+  .post(
+    '/courses/:id/assignments',
+    staff,
+    singleFile('attachment', MAX_RESOURCE_BYTES),
+    courses.createAssignment,
+  )
   .get('/courses/:id/quizzes', courses.listQuizzes)
   .post('/courses/:id/quizzes', staff, courses.createQuiz)
   .get('/courses/:id/messages', courses.listMessages)
@@ -45,7 +55,12 @@ export const appRoutes = Router()
   .patch('/assignments/:id', staff, learning.updateAssignment)
   .delete('/assignments/:id', staff, learning.deleteAssignment)
   .get('/assignments/:id/attachment', learning.assignmentAttachment)
-  .put('/assignments/:id/submission', student, singleFile('file', MAX_SUBMISSION_BYTES), learning.submit)
+  .put(
+    '/assignments/:id/submission',
+    student,
+    singleFile('file', MAX_SUBMISSION_BYTES),
+    learning.submit,
+  )
   .get('/assignments/:id/submissions', staff, learning.submissions)
   .patch('/submissions/:id/grade', staff, learning.grade)
   .get('/submissions/:id/file', learning.submissionFile)
@@ -70,7 +85,12 @@ export const appRoutes = Router()
   .delete('/messages/:id', comms.deleteMessage)
 
   // Complaints
-  .post('/complaints', members, singleFile('attachment', MAX_COMPLAINT_ATTACHMENT_BYTES), comms.createComplaint)
+  .post(
+    '/complaints',
+    members,
+    singleFile('attachment', MAX_COMPLAINT_ATTACHMENT_BYTES),
+    comms.createComplaint,
+  )
   .get('/complaints/mine', members, comms.myComplaints)
   .get('/complaints/:id', comms.getComplaint)
   .post('/complaints/:id/follow-up', members, comms.followUp)

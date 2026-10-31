@@ -3,7 +3,10 @@ import { paginationSchema } from '../lib/pagination.js';
 import { isoDateTime, requiredText, uuidSchema } from './common.schema.js';
 
 export const createAnnouncementSchema = z.object({
-  courseId: uuidSchema.nullable().optional().transform((value) => value ?? null),
+  courseId: uuidSchema
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
   title: requiredText('Title', 1, 200),
   body: requiredText('Message', 1, 10000),
   isPinned: z.boolean().default(false),

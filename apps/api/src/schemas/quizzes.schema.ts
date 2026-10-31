@@ -4,7 +4,12 @@ import { isoDateTime, optionalText, requiredText, uuidSchema } from './common.sc
 export const questionTypeSchema = z.enum(['mcq_single', 'mcq_multi', 'true_false']);
 
 const optionSchema = z.object({
-  id: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9_-]+$/, 'Invalid option id.'),
+  id: z
+    .string()
+    .trim()
+    .min(1)
+    .max(20)
+    .regex(/^[A-Za-z0-9_-]+$/, 'Invalid option id.'),
   text: requiredText('Option text', 1, 500),
 });
 
@@ -37,10 +42,18 @@ export const questionSchema = z
     }
     const correct = [...new Set(q.correctOptionIds)];
     if (correct.some((id) => !ids.includes(id))) {
-      issue.addIssue({ code: 'custom', path: ['correctOptionIds'], message: 'Correct answers must be one of the options.' });
+      issue.addIssue({
+        code: 'custom',
+        path: ['correctOptionIds'],
+        message: 'Correct answers must be one of the options.',
+      });
     }
     if (q.type !== 'mcq_multi' && correct.length !== 1) {
-      issue.addIssue({ code: 'custom', path: ['correctOptionIds'], message: 'This question type needs exactly one correct answer.' });
+      issue.addIssue({
+        code: 'custom',
+        path: ['correctOptionIds'],
+        message: 'This question type needs exactly one correct answer.',
+      });
     }
   });
 
@@ -49,7 +62,11 @@ export type QuestionInput = z.output<typeof questionSchema>;
 const quizFields = {
   title: requiredText('Title', 1, 200),
   description: optionalText(2000),
-  timeLimitMinutes: z.coerce.number().int('Use whole minutes.').min(1, 'At least 1 minute.').max(600, 'At most 600 minutes.'),
+  timeLimitMinutes: z.coerce
+    .number()
+    .int('Use whole minutes.')
+    .min(1, 'At least 1 minute.')
+    .max(600, 'At most 600 minutes.'),
   opensAt: isoDateTime('Opening time'),
   closesAt: isoDateTime('Closing time'),
   isPublished: z.boolean().default(false),
@@ -59,7 +76,10 @@ const quizFields = {
 export const createQuizSchema = z
   .object({
     ...quizFields,
-    questions: z.array(questionSchema).min(1, 'Add at least one question.').max(100, 'At most 100 questions.'),
+    questions: z
+      .array(questionSchema)
+      .min(1, 'Add at least one question.')
+      .max(100, 'At most 100 questions.'),
   })
   .refine((q) => new Date(q.closesAt) > new Date(q.opensAt), {
     path: ['closesAt'],

@@ -31,7 +31,9 @@ function toAnnouncement(row: AnnouncementRow): Announcement {
     id: row.id,
     courseId: row.course_id,
     course: row.course,
-    author: row.author ? { id: row.author.id, fullName: row.author.full_name, role: row.author.role } : null,
+    author: row.author
+      ? { id: row.author.id, fullName: row.author.full_name, role: row.author.role }
+      : null,
     authorId: row.author_id,
     title: row.title,
     body: row.body,
@@ -44,7 +46,9 @@ function toAnnouncement(row: AnnouncementRow): Announcement {
 
 /** PostgREST filter: global announcements plus the given courses. */
 function scopeFilter(courseIds: string[]): string {
-  return courseIds.length > 0 ? `course_id.is.null,course_id.in.(${courseIds.join(',')})` : 'course_id.is.null';
+  return courseIds.length > 0
+    ? `course_id.is.null,course_id.in.(${courseIds.join(',')})`
+    : 'course_id.is.null';
 }
 
 export interface FeedScope {
@@ -101,19 +105,25 @@ export const announcementsRepository = {
   async markRead(db: Db, userId: string, ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     unwrap(
-      await db
-        .from('announcement_reads')
-        .upsert(ids.map((announcement_id) => ({ user_id: userId, announcement_id })), {
+      await db.from('announcement_reads').upsert(
+        ids.map((announcement_id) => ({ user_id: userId, announcement_id })),
+        {
           onConflict: 'user_id,announcement_id',
           ignoreDuplicates: true,
-        }),
+        },
+      ),
       'Announcement',
     );
   },
 
   async findById(db: Db, id: string, userId: string): Promise<Announcement | null> {
     const row = unwrap(
-      await db.from('announcements').select(SELECT).eq('id', id).eq('announcement_reads.user_id', userId).maybeSingle(),
+      await db
+        .from('announcements')
+        .select(SELECT)
+        .eq('id', id)
+        .eq('announcement_reads.user_id', userId)
+        .maybeSingle(),
       'Announcement',
     );
     return row ? toAnnouncement(row as unknown as AnnouncementRow) : null;
@@ -121,7 +131,13 @@ export const announcementsRepository = {
 
   async insert(
     db: Db,
-    input: { courseId: string | null; authorId: string; title: string; body: string; isPinned: boolean },
+    input: {
+      courseId: string | null;
+      authorId: string;
+      title: string;
+      body: string;
+      isPinned: boolean;
+    },
   ): Promise<string> {
     return unwrapRequired(
       await db
@@ -139,7 +155,15 @@ export const announcementsRepository = {
     ).id;
   },
 
-  async update(db: Db, id: string, patch: { title?: string | undefined; body?: string | undefined; isPinned?: boolean | undefined }) {
+  async update(
+    db: Db,
+    id: string,
+    patch: {
+      title?: string | undefined;
+      body?: string | undefined;
+      isPinned?: boolean | undefined;
+    },
+  ) {
     unwrapRequired(
       await db
         .from('announcements')
@@ -156,6 +180,9 @@ export const announcementsRepository = {
   },
 
   async delete(db: Db, id: string): Promise<boolean> {
-    return unwrapList(await db.from('announcements').delete().eq('id', id).select('id'), 'Announcement').length > 0;
+    return (
+      unwrapList(await db.from('announcements').delete().eq('id', id).select('id'), 'Announcement')
+        .length > 0
+    );
   },
 };

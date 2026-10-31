@@ -20,7 +20,10 @@ export async function courseRole(ctx: RequestContext, courseId: string): Promise
 }
 
 /** Teachers of the course and admins. */
-export async function assertCourseStaff(ctx: RequestContext, courseId: string): Promise<CourseRole> {
+export async function assertCourseStaff(
+  ctx: RequestContext,
+  courseId: string,
+): Promise<CourseRole> {
   const role = await courseRole(ctx, courseId);
   if (role === 'student') throw forbidden("Only this course's teachers can do this.");
   return role;

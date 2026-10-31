@@ -10,7 +10,11 @@ export function toAppError(error: PostgrestError, entity = 'Resource'): AppError
     case '23505':
       return conflict(`${entity} already exists.`);
     case '23514':
-      return unprocessable(error.message.startsWith('new row') ? `Invalid ${entity.toLowerCase()} data.` : error.message);
+      return unprocessable(
+        error.message.startsWith('new row')
+          ? `Invalid ${entity.toLowerCase()} data.`
+          : error.message,
+      );
     case '23503':
       return unprocessable(`A referenced record does not exist.`);
     case '22P02':

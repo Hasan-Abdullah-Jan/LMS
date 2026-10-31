@@ -10,7 +10,11 @@ import {
   markReadSchema,
   updateAnnouncementSchema,
 } from '../schemas/communication.schema.js';
-import { complaintsQuery, createComplaintSchema, followUpSchema } from '../schemas/complaints.schema.js';
+import {
+  complaintsQuery,
+  createComplaintSchema,
+  followUpSchema,
+} from '../schemas/complaints.schema.js';
 import { announcementsService } from '../services/announcements.service.js';
 import { chatService } from '../services/chat.service.js';
 import { complaintsService } from '../services/complaints.service.js';
@@ -31,11 +35,18 @@ export const communicationController = {
     sendData(res, await announcementsService.markRead(ctx(req), upTo));
   },
   async createAnnouncement(req: Request, res: Response) {
-    sendData(res, await announcementsService.create(ctx(req), validate(createAnnouncementSchema, req.body)), 201);
+    sendData(
+      res,
+      await announcementsService.create(ctx(req), validate(createAnnouncementSchema, req.body)),
+      201,
+    );
   },
   async updateAnnouncement(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
-    sendData(res, await announcementsService.update(ctx(req), id, validate(updateAnnouncementSchema, req.body)));
+    sendData(
+      res,
+      await announcementsService.update(ctx(req), id, validate(updateAnnouncementSchema, req.body)),
+    );
   },
   async deleteAnnouncement(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);

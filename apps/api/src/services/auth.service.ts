@@ -19,7 +19,11 @@ export interface AuthSession {
 
 const INVALID_CREDENTIALS = new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
 const deactivated = () =>
-  new AppError(403, 'ACCOUNT_DEACTIVATED', 'Your account has been deactivated. Contact the administrator.');
+  new AppError(
+    403,
+    'ACCOUNT_DEACTIVATED',
+    'Your account has been deactivated. Contact the administrator.',
+  );
 const linkInvalid = () =>
   new AppError(
     400,
@@ -67,7 +71,8 @@ export const authService = {
 
   async refresh(refreshToken: string): Promise<AuthSession> {
     const session = await authRepository.refreshSession(refreshToken);
-    if (!session) throw new AppError(401, 'UNAUTHORIZED', 'Your session has expired. Please sign in again.');
+    if (!session)
+      throw new AppError(401, 'UNAUTHORIZED', 'Your session has expired. Please sign in again.');
     const profile = await profilesRepository.findById(supabaseAdmin, session.user.id);
     if (!profile || !profile.isActive) {
       await authRepository.signOut(session.access_token);

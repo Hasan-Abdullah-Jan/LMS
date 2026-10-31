@@ -37,12 +37,15 @@ export const marksService = {
   /** Student's own marks grouped per course. Never another student's (403). */
   async myMarks(ctx: RequestContext, courseId?: string, studentId?: string) {
     if (ctx.user.role !== 'student') throw forbidden('Only students have personal marks.');
-    if (studentId && studentId !== ctx.user.id) throw forbidden("You can only view your own marks.");
+    if (studentId && studentId !== ctx.user.id)
+      throw forbidden('You can only view your own marks.');
     if (courseId) await courseRole(ctx, courseId);
 
     await quizzesRepository.finalizeExpired();
     const items = await marksRepository.forStudent(ctx.db, ctx.user.id, courseId);
-    const courseIds = courseId ? [courseId] : await coursesRepository.courseIdsForStudent(ctx.db, ctx.user.id);
+    const courseIds = courseId
+      ? [courseId]
+      : await coursesRepository.courseIdsForStudent(ctx.db, ctx.user.id);
     const courses = await coursesRepository.findByIds(ctx.db, courseIds);
 
     const perCourse = courses.map((course) => {
@@ -78,40 +81,76 @@ export const marksService = {
       quizzesRepository.listByCourse(ctx.db, courseId, false),
       marksRepository.forCourse(ctx.db, courseId),
     ]);
-    const quizStats = await quizzesRepository.questionStats(supabaseAdmin, quizzes.map((q) => q.id));
+    const quizStats = await quizzesRepository.questionStats(
+      supabaseAdmin,
+      quizzes.map((q) => q.id),
+    );
 
     const items = [
-      ...assignments.map((a) => ({ id: a.id, kind: 'assignment' as const, title: a.title, max: a.maxMarks, date: a.dueAt })),
+      ...assignments.map((a) => ({
+        id: a.id,
+        kind: 'assignment' as const,
+        title: a.title,
+        max: a.maxMarks,
+        date: a.dueAt,
+      })),
       ...quizzes
         .filter((q) => q.isPublished)
-        .map((q) => ({ id: q.id, kind: 'quiz' as const, title: q.title, max: quizStats.get(q.id)?.totalMarks ?? 0, date: q.opensAt })),
+        .map((q) => ({
+          id: q.id,
+          kind: 'quiz' as const,
+          title: q.title,
+          max: quizStats.get(q.id)?.totalMarks ?? 0,
+          date: q.opensAt,
+        })),
     ].sort((a, b) => a.date.localeCompare(b.date));
 
     const rows = students.map((student) => {
-      const cells: Record<string, { obtained: number | null; status: 'graded' | 'pending' | 'missing'; sourceId: string | null }> = {};
+      const cells: Record<
+        string,
+        {
+          obtained: number | null;
+          status: 'graded' | 'pending' | 'missing';
+          sourceId: string | null;
+        }
+      > = {};
       const graded: Array<{ obtained: number | null; max: number }> = [];
       for (const item of items) {
         const mark = marks.find((m) => m.studentId === student.id && m.itemId === item.id);
         cells[item.id] = mark
-          ? { obtained: mark.obtained, status: mark.obtained === null ? 'pending' : 'graded', sourceId: mark.sourceId }
+          ? {
+              obtained: mark.obtained,
+              status: mark.obtained === null ? 'pending' : 'graded',
+              sourceId: mark.sourceId,
+            }
           : { obtained: null, status: 'missing', sourceId: null };
         if (mark) graded.push({ obtained: mark.obtained, max: item.max });
       }
       return {
-        student: { id: student.id, fullName: student.fullName, email: student.email, rollNo: student.rollNo },
+        student: {
+          id: student.id,
+          fullName: student.fullName,
+          email: student.email,
+          rollNo: student.rollNo,
+        },
         cells,
         totals: computeTotals(graded),
       };
     });
 
     return {
-      course: course ? { id: course.id, code: course.code, title: course.title } : { id: courseId, code: '', title: '' },
+      course: course
+        ? { id: course.id, code: course.code, title: course.title }
+        : { id: courseId, code: '', title: '' },
       items: items.map(({ date: _date, ...item }) => item),
       rows,
     };
   },
 
-  async gradebookCsv(ctx: RequestContext, courseId: string): Promise<{ fileName: string; csv: string }> {
+  async gradebookCsv(
+    ctx: RequestContext,
+    courseId: string,
+  ): Promise<{ fileName: string; csv: string }> {
     const book = await this.gradebook(ctx, courseId);
     const header = [
       'Student',

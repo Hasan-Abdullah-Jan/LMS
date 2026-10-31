@@ -1,7 +1,10 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { forbidden, notFound } from '../lib/errors.js';
 import type { Pagination } from '../lib/pagination.js';
-import { announcementsRepository, type FeedScope } from '../repositories/announcements.repository.js';
+import {
+  announcementsRepository,
+  type FeedScope,
+} from '../repositories/announcements.repository.js';
 import { auditRepository } from '../repositories/audit.repository.js';
 import { coursesRepository } from '../repositories/courses.repository.js';
 import type { RequestContext } from '../types/auth.js';
@@ -31,10 +34,15 @@ async function requireOwnOrAdmin(ctx: RequestContext, id: string) {
 export const announcementsService = {
   async feed(ctx: RequestContext, filters: Pagination & { courseId?: string | undefined }) {
     const scope = await feedScope(ctx);
-    if (filters.courseId === 'global') return announcementsRepository.feed(ctx.db, { ...scope, globalOnly: true }, filters);
+    if (filters.courseId === 'global')
+      return announcementsRepository.feed(ctx.db, { ...scope, globalOnly: true }, filters);
     if (filters.courseId) {
       await courseRole(ctx, filters.courseId);
-      return announcementsRepository.feed(ctx.db, { ...scope, courseId: filters.courseId }, filters);
+      return announcementsRepository.feed(
+        ctx.db,
+        { ...scope, courseId: filters.courseId },
+        filters,
+      );
     }
     return announcementsRepository.feed(ctx.db, scope, filters);
   },
@@ -46,15 +54,23 @@ export const announcementsService = {
   /** Mark everything visible up to a timestamp (default: now) as read. */
   async markRead(ctx: RequestContext, upTo?: string) {
     const scope = await feedScope(ctx);
-    const ids = await announcementsRepository.unreadIdsUpTo(ctx.db, scope, upTo ?? new Date().toISOString());
+    const ids = await announcementsRepository.unreadIdsUpTo(
+      ctx.db,
+      scope,
+      upTo ?? new Date().toISOString(),
+    );
     await announcementsRepository.markRead(ctx.db, ctx.user.id, ids);
     return { marked: ids.length };
   },
 
   /** null courseId (global) is admin-only; course posts need the course's teacher (or admin). */
-  async create(ctx: RequestContext, input: { courseId: string | null; title: string; body: string; isPinned: boolean }) {
+  async create(
+    ctx: RequestContext,
+    input: { courseId: string | null; title: string; body: string; isPinned: boolean },
+  ) {
     if (input.courseId === null) {
-      if (ctx.user.role !== 'admin') throw forbidden('Only administrators can post global announcements.');
+      if (ctx.user.role !== 'admin')
+        throw forbidden('Only administrators can post global announcements.');
     } else {
       await assertCourseStaff(ctx, input.courseId);
     }
@@ -66,7 +82,15 @@ export const announcementsService = {
     return announcementsRepository.findById(ctx.db, id, ctx.user.id);
   },
 
-  async update(ctx: RequestContext, id: string, patch: { title?: string | undefined; body?: string | undefined; isPinned?: boolean | undefined }) {
+  async update(
+    ctx: RequestContext,
+    id: string,
+    patch: {
+      title?: string | undefined;
+      body?: string | undefined;
+      isPinned?: boolean | undefined;
+    },
+  ) {
     await requireOwnOrAdmin(ctx, id);
     await announcementsRepository.update(ctx.db, id, patch);
     await auditRepository.record(ctx.user.id, 'announcement.update', 'announcement', id);
@@ -76,7 +100,8 @@ export const announcementsService = {
   async remove(ctx: RequestContext, id: string) {
     const existing = await requireOwnOrAdmin(ctx, id);
     if (!(await announcementsRepository.delete(ctx.db, id))) throw forbidden();
-    await auditRepository.record(ctx.user.id, 'announcement.delete', 'announcement', id, { title: existing.title });
+    await auditRepository.record(ctx.user.id, 'announcement.delete', 'announcement', id, {
+      title: existing.title,
+    });
   },
 };
-

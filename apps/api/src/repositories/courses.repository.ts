@@ -80,7 +80,10 @@ export const coursesRepository = {
   },
 
   async findById(db: Db, id: string): Promise<Course | null> {
-    const row = unwrap(await db.from('courses').select(COURSE_SELECT).eq('id', id).maybeSingle(), 'Course');
+    const row = unwrap(
+      await db.from('courses').select(COURSE_SELECT).eq('id', id).maybeSingle(),
+      'Course',
+    );
     return row ? toCourse(row as unknown as CourseRow) : null;
   },
 
@@ -92,7 +95,10 @@ export const coursesRepository = {
     return rows.map(toCourse);
   },
 
-  async create(db: Db, input: Required<Pick<CourseInput, 'code' | 'title'>> & CourseInput): Promise<string> {
+  async create(
+    db: Db,
+    input: Required<Pick<CourseInput, 'code' | 'title'>> & CourseInput,
+  ): Promise<string> {
     const row = unwrapRequired(
       await db
         .from('courses')
@@ -132,12 +138,10 @@ export const coursesRepository = {
   async addTeachers(db: Db, courseId: string, teacherIds: string[]): Promise<void> {
     if (teacherIds.length === 0) return;
     unwrap(
-      await db
-        .from('course_teachers')
-        .upsert(
-          teacherIds.map((teacher_id) => ({ course_id: courseId, teacher_id })),
-          { onConflict: 'course_id,teacher_id', ignoreDuplicates: true },
-        ),
+      await db.from('course_teachers').upsert(
+        teacherIds.map((teacher_id) => ({ course_id: courseId, teacher_id })),
+        { onConflict: 'course_id,teacher_id', ignoreDuplicates: true },
+      ),
       'Course teacher',
     );
   },
@@ -145,7 +149,11 @@ export const coursesRepository = {
   async removeTeachers(db: Db, courseId: string, teacherIds: string[]): Promise<void> {
     if (teacherIds.length === 0) return;
     unwrap(
-      await db.from('course_teachers').delete().eq('course_id', courseId).in('teacher_id', teacherIds),
+      await db
+        .from('course_teachers')
+        .delete()
+        .eq('course_id', courseId)
+        .in('teacher_id', teacherIds),
       'Course teacher',
     );
   },
@@ -162,12 +170,10 @@ export const coursesRepository = {
   async enroll(db: Db, courseId: string, studentIds: string[]): Promise<void> {
     if (studentIds.length === 0) return;
     unwrap(
-      await db
-        .from('enrollments')
-        .upsert(
-          studentIds.map((student_id) => ({ course_id: courseId, student_id })),
-          { onConflict: 'course_id,student_id', ignoreDuplicates: true },
-        ),
+      await db.from('enrollments').upsert(
+        studentIds.map((student_id) => ({ course_id: courseId, student_id })),
+        { onConflict: 'course_id,student_id', ignoreDuplicates: true },
+      ),
       'Enrollment',
     );
   },

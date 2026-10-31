@@ -2,7 +2,11 @@ import type { Request, Response } from 'express';
 import { sendData, sendNoContent } from '../lib/http.js';
 import { validate } from '../lib/validation.js';
 import { ctx } from '../middleware/auth.js';
-import { gradeSchema, submitSchema, updateAssignmentSchema } from '../schemas/assignments.schema.js';
+import {
+  gradeSchema,
+  submitSchema,
+  updateAssignmentSchema,
+} from '../schemas/assignments.schema.js';
 import { idParams } from '../schemas/common.schema.js';
 import { submitAttemptSchema, updateQuizSchema } from '../schemas/quizzes.schema.js';
 import { assignmentsService } from '../services/assignments.service.js';
@@ -27,7 +31,10 @@ export const learningController = {
   },
   async updateAssignment(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
-    sendData(res, await assignmentsService.update(ctx(req), id, validate(updateAssignmentSchema, req.body)));
+    sendData(
+      res,
+      await assignmentsService.update(ctx(req), id, validate(updateAssignmentSchema, req.body)),
+    );
   },
   async deleteAssignment(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);

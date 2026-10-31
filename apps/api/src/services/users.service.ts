@@ -32,7 +32,11 @@ export type AdminResetInput = { mode: 'email' } | { mode: 'temporary'; temporary
 export const usersService = {
   list(
     ctx: RequestContext,
-    filters: Pagination & { search?: string | undefined; role?: Role | undefined; status?: 'active' | 'inactive' | undefined },
+    filters: Pagination & {
+      search?: string | undefined;
+      role?: Role | undefined;
+      status?: 'active' | 'inactive' | undefined;
+    },
   ) {
     return profilesRepository.list(ctx.db, {
       page: filters.page,
@@ -65,7 +69,11 @@ export const usersService = {
       if (error?.code === 'email_exists' || error?.status === 422) {
         throw conflict('A user with this email already exists.');
       }
-      throw new AppError(502, 'INTERNAL_ERROR', 'The account could not be created. Please try again.');
+      throw new AppError(
+        502,
+        'INTERNAL_ERROR',
+        'The account could not be created. Please try again.',
+      );
     }
 
     try {
@@ -138,9 +146,16 @@ export const usersService = {
     if (!target) throw notFound('User');
 
     if (input.mode === 'email') {
-      const error = await authRepository.sendPasswordResetEmail(target.email, env.PASSWORD_RESET_REDIRECT);
+      const error = await authRepository.sendPasswordResetEmail(
+        target.email,
+        env.PASSWORD_RESET_REDIRECT,
+      );
       if (error) {
-        throw new AppError(502, 'INTERNAL_ERROR', 'The reset email could not be sent. Try a temporary password instead.');
+        throw new AppError(
+          502,
+          'INTERNAL_ERROR',
+          'The reset email could not be sent. Try a temporary password instead.',
+        );
       }
       await auditRepository.record(ctx.user.id, 'user.reset_password_email', 'user', id);
       return { message: `A password reset link was sent to ${target.email}.` };
@@ -151,6 +166,8 @@ export const usersService = {
     await profilesRepository.update(supabaseAdmin, id, { mustChangePassword: true });
     await authRepository.revokeSessions(id);
     await auditRepository.record(ctx.user.id, 'user.reset_password_temporary', 'user', id);
-    return { message: `A temporary password was set. ${target.fullName} must change it at next sign-in.` };
+    return {
+      message: `A temporary password was set. ${target.fullName} must change it at next sign-in.`,
+    };
   },
 };

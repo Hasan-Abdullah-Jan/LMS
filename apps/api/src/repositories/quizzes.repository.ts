@@ -114,7 +114,12 @@ export interface QuestionWithKey {
 
 export const quizzesRepository = {
   async listByCourse(db: Db, courseId: string, publishedOnly: boolean): Promise<Quiz[]> {
-    let query = db.from('quizzes').select('*').eq('course_id', courseId).order('opens_at', { ascending: false }).limit(200);
+    let query = db
+      .from('quizzes')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('opens_at', { ascending: false })
+      .limit(200);
     if (publishedOnly) query = query.eq('is_published', true);
     return unwrapList(await query, 'Quiz').map(toQuiz);
   },
@@ -151,7 +156,10 @@ export const quizzesRepository = {
   },
 
   /** Question totals per quiz (count and marks). */
-  async questionStats(db: Db, quizIds: string[]): Promise<Map<string, { count: number; totalMarks: number }>> {
+  async questionStats(
+    db: Db,
+    quizIds: string[],
+  ): Promise<Map<string, { count: number; totalMarks: number }>> {
     const stats = new Map<string, { count: number; totalMarks: number }>();
     if (quizIds.length === 0) return stats;
     const rows = unwrapList(
@@ -170,7 +178,10 @@ export const quizzesRepository = {
   /** Answer key. Read with the caller's client (staff) or the service role (grading). */
   async answerKey(db: Db, quizId: string): Promise<Map<string, string[]>> {
     const rows = unwrapList(
-      await db.from('quiz_answers').select('question_id, correct_option_ids, quiz_questions!inner(quiz_id)').eq('quiz_questions.quiz_id', quizId),
+      await db
+        .from('quiz_answers')
+        .select('question_id, correct_option_ids, quiz_questions!inner(quiz_id)')
+        .eq('quiz_questions.quiz_id', quizId),
       'Answer key',
     );
     return new Map(rows.map((row) => [row.question_id, row.correct_option_ids]));
@@ -198,18 +209,26 @@ export const quizzesRepository = {
     return toQuiz(row);
   },
 
-  async updateQuiz(db: Db, id: string, patch: Partial<Omit<QuizInsert, 'courseId' | 'createdBy'>>): Promise<Quiz> {
+  async updateQuiz(
+    db: Db,
+    id: string,
+    patch: Partial<Omit<QuizInsert, 'courseId' | 'createdBy'>>,
+  ): Promise<Quiz> {
     const row = unwrapRequired(
       await db
         .from('quizzes')
         .update({
           ...(patch.title !== undefined && { title: patch.title }),
           ...(patch.description !== undefined && { description: patch.description }),
-          ...(patch.timeLimitMinutes !== undefined && { time_limit_minutes: patch.timeLimitMinutes }),
+          ...(patch.timeLimitMinutes !== undefined && {
+            time_limit_minutes: patch.timeLimitMinutes,
+          }),
           ...(patch.opensAt !== undefined && { opens_at: patch.opensAt }),
           ...(patch.closesAt !== undefined && { closes_at: patch.closesAt }),
           ...(patch.isPublished !== undefined && { is_published: patch.isPublished }),
-          ...(patch.shuffleQuestions !== undefined && { shuffle_questions: patch.shuffleQuestions }),
+          ...(patch.shuffleQuestions !== undefined && {
+            shuffle_questions: patch.shuffleQuestions,
+          }),
         })
         .eq('id', id)
         .select('*')
@@ -258,7 +277,12 @@ export const quizzesRepository = {
   // ---------------------------------------------------------------- attempts
   async findAttempt(db: Db, quizId: string, studentId: string): Promise<Attempt | null> {
     const row = unwrap(
-      await db.from('quiz_attempts').select('*').eq('quiz_id', quizId).eq('student_id', studentId).maybeSingle(),
+      await db
+        .from('quiz_attempts')
+        .select('*')
+        .eq('quiz_id', quizId)
+        .eq('student_id', studentId)
+        .maybeSingle(),
       'Attempt',
     );
     return row ? toAttempt(row) : null;
@@ -266,7 +290,10 @@ export const quizzesRepository = {
 
   async attemptsForQuizzes(db: Db, quizIds: string[]): Promise<Attempt[]> {
     if (quizIds.length === 0) return [];
-    const rows = unwrapList(await db.from('quiz_attempts').select('*').in('quiz_id', quizIds), 'Attempt');
+    const rows = unwrapList(
+      await db.from('quiz_attempts').select('*').in('quiz_id', quizIds),
+      'Attempt',
+    );
     return rows.map(toAttempt);
   },
 
@@ -280,7 +307,12 @@ export const quizzesRepository = {
   },
 
   /** Attempts are written only by the server (service role) so scores can't be forged. */
-  async createAttempt(input: { quizId: string; studentId: string; expiresAt: string; questionOrder: string[] }): Promise<Attempt> {
+  async createAttempt(input: {
+    quizId: string;
+    studentId: string;
+    expiresAt: string;
+    questionOrder: string[];
+  }): Promise<Attempt> {
     const row = unwrapRequired(
       await supabaseAdmin
         .from('quiz_attempts')
@@ -299,11 +331,18 @@ export const quizzesRepository = {
   },
 
   /** Finalize atomically: only succeeds if the attempt is still open. */
-  async finalizeAttempt(id: string, input: { answers: Record<string, string[]>; score: number; submittedAt: string }): Promise<Attempt | null> {
+  async finalizeAttempt(
+    id: string,
+    input: { answers: Record<string, string[]>; score: number; submittedAt: string },
+  ): Promise<Attempt | null> {
     const row = unwrap(
       await supabaseAdmin
         .from('quiz_attempts')
-        .update({ answers: input.answers as unknown as NonNullable<Json>, score: input.score, submitted_at: input.submittedAt })
+        .update({
+          answers: input.answers as unknown as NonNullable<Json>,
+          score: input.score,
+          submitted_at: input.submittedAt,
+        })
         .eq('id', id)
         .is('submitted_at', null)
         .select('*')
@@ -317,12 +356,21 @@ export const quizzesRepository = {
   async finalizeExpired(): Promise<void> {
     const cutoff = new Date(Date.now() - GRACE_SECONDS * 1000).toISOString();
     const expired = unwrapList(
-      await supabaseAdmin.from('quiz_attempts').select('id, expires_at').is('submitted_at', null).lt('expires_at', cutoff).limit(500),
+      await supabaseAdmin
+        .from('quiz_attempts')
+        .select('id, expires_at')
+        .is('submitted_at', null)
+        .lt('expires_at', cutoff)
+        .limit(500),
       'Attempt',
     );
     await Promise.all(
       expired.map((row) =>
-        supabaseAdmin.from('quiz_attempts').update({ score: 0, submitted_at: row.expires_at }).eq('id', row.id).is('submitted_at', null),
+        supabaseAdmin
+          .from('quiz_attempts')
+          .update({ score: 0, submitted_at: row.expires_at })
+          .eq('id', row.id)
+          .is('submitted_at', null),
       ),
     );
   },

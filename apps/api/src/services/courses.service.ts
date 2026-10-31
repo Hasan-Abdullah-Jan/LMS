@@ -3,7 +3,11 @@ import { parseEmailList } from '../lib/csv.js';
 import { conflict, notFound, unprocessable } from '../lib/errors.js';
 import type { Pagination } from '../lib/pagination.js';
 import { auditRepository } from '../repositories/audit.repository.js';
-import { coursesRepository, type Course, type CourseMember } from '../repositories/courses.repository.js';
+import {
+  coursesRepository,
+  type Course,
+  type CourseMember,
+} from '../repositories/courses.repository.js';
 import { profilesRepository, type Profile } from '../repositories/profiles.repository.js';
 import type { RequestContext } from '../types/auth.js';
 import { courseRole, type CourseRole } from './access.service.js';
@@ -31,7 +35,10 @@ async function requireCourse(ctx: RequestContext, id: string): Promise<Course> {
 
 export const coursesService = {
   // ---------------------------------------------------------------- admin
-  list(ctx: RequestContext, filters: Pagination & { search?: string | undefined; status: 'active' | 'archived' | 'all' }) {
+  list(
+    ctx: RequestContext,
+    filters: Pagination & { search?: string | undefined; status: 'active' | 'archived' | 'all' },
+  ) {
     return coursesRepository.list(ctx.db, {
       ...filters,
       archived: filters.status === 'all' ? undefined : filters.status === 'archived',
@@ -44,9 +51,13 @@ export const coursesService = {
     return { ...course, students };
   },
 
-  async create(ctx: RequestContext, input: { code: string; title: string; description?: string | undefined }) {
+  async create(
+    ctx: RequestContext,
+    input: { code: string; title: string; description?: string | undefined },
+  ) {
     const id = await coursesRepository.create(ctx.db, input).catch((err: unknown) => {
-      if ((err as { code?: string }).code === 'CONFLICT') throw conflict(`Course code ${input.code} is already in use.`);
+      if ((err as { code?: string }).code === 'CONFLICT')
+        throw conflict(`Course code ${input.code} is already in use.`);
       throw err;
     });
     await auditRepository.record(ctx.user.id, 'course.create', 'course', id, { code: input.code });
@@ -56,14 +67,25 @@ export const coursesService = {
   async update(
     ctx: RequestContext,
     id: string,
-    input: { code?: string | undefined; title?: string | undefined; description?: string | null | undefined; isArchived?: boolean | undefined },
+    input: {
+      code?: string | undefined;
+      title?: string | undefined;
+      description?: string | null | undefined;
+      isArchived?: boolean | undefined;
+    },
   ) {
     await requireCourse(ctx, id);
     await coursesRepository.update(ctx.db, id, input).catch((err: unknown) => {
-      if ((err as { code?: string }).code === 'CONFLICT') throw conflict(`Course code ${input.code} is already in use.`);
+      if ((err as { code?: string }).code === 'CONFLICT')
+        throw conflict(`Course code ${input.code} is already in use.`);
       throw err;
     });
-    const action = input.isArchived === true ? 'course.archive' : input.isArchived === false ? 'course.restore' : 'course.update';
+    const action =
+      input.isArchived === true
+        ? 'course.archive'
+        : input.isArchived === false
+          ? 'course.restore'
+          : 'course.update';
     await auditRepository.record(ctx.user.id, action, 'course', id, { ...input });
     return requireCourse(ctx, id);
   },
@@ -73,16 +95,31 @@ export const coursesService = {
     await requireCourse(ctx, id);
     const unique = [...new Set(teacherIds)];
     const profiles = await profilesRepository.findByIds(ctx.db, unique);
-    const invalid = unique.filter((tid) => !profiles.some((p) => p.id === tid && p.role === 'teacher' && p.isActive));
+    const invalid = unique.filter(
+      (tid) => !profiles.some((p) => p.id === tid && p.role === 'teacher' && p.isActive),
+    );
     if (invalid.length > 0) {
       throw unprocessable('Only active teachers can be assigned to a course.', [
-        { path: 'teacherIds', message: `${invalid.length} selected user(s) are not active teachers.` },
+        {
+          path: 'teacherIds',
+          message: `${invalid.length} selected user(s) are not active teachers.`,
+        },
       ]);
     }
     const current = await coursesRepository.teacherIds(ctx.db, id);
-    await coursesRepository.removeTeachers(ctx.db, id, current.filter((tid) => !unique.includes(tid)));
-    await coursesRepository.addTeachers(ctx.db, id, unique.filter((tid) => !current.includes(tid)));
-    await auditRepository.record(ctx.user.id, 'course.set_teachers', 'course', id, { teacherIds: unique });
+    await coursesRepository.removeTeachers(
+      ctx.db,
+      id,
+      current.filter((tid) => !unique.includes(tid)),
+    );
+    await coursesRepository.addTeachers(
+      ctx.db,
+      id,
+      unique.filter((tid) => !current.includes(tid)),
+    );
+    await auditRepository.record(ctx.user.id, 'course.set_teachers', 'course', id, {
+      teacherIds: unique,
+    });
     return requireCourse(ctx, id);
   },
 
@@ -131,7 +168,11 @@ export const coursesService = {
     report.matched = toEnroll.map((p) => ({ id: p.id, email: p.email, fullName: p.fullName }));
 
     if (!dryRun && toEnroll.length > 0) {
-      await coursesRepository.enroll(ctx.db, id, toEnroll.map((p) => p.id));
+      await coursesRepository.enroll(
+        ctx.db,
+        id,
+        toEnroll.map((p) => p.id),
+      );
       report.enrolled = toEnroll.length;
       await auditRepository.record(ctx.user.id, 'course.enroll', 'course', id, {
         studentIds: toEnroll.map((p) => p.id),

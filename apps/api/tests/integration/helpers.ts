@@ -40,7 +40,8 @@ export async function login(email: string, password = PASSWORD): Promise<string>
   const cached = tokens.get(`${email}:${password}`);
   if (cached) return cached;
   const res = await api().post('/api/auth/login').send({ email, password });
-  if (res.status !== 200) throw new Error(`Login failed for ${email}: ${res.status} ${JSON.stringify(res.body)}`);
+  if (res.status !== 200)
+    throw new Error(`Login failed for ${email}: ${res.status} ${JSON.stringify(res.body)}`);
   tokens.set(`${email}:${password}`, res.body.data.accessToken);
   return res.body.data.accessToken as string;
 }

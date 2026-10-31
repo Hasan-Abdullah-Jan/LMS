@@ -14,6 +14,8 @@ export interface PersonSummary {
   role: Row<'profiles'>['role'];
 }
 
-export function toPersonSummary(row: Pick<Row<'profiles'>, 'id' | 'full_name' | 'email' | 'role'>): PersonSummary {
+export function toPersonSummary(
+  row: Pick<Row<'profiles'>, 'id' | 'full_name' | 'email' | 'role'>,
+): PersonSummary {
   return { id: row.id, fullName: row.full_name, email: row.email, role: row.role };
 }

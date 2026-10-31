@@ -24,7 +24,11 @@ const cookieOptions = (): CookieOptions => ({
 /** Access token goes to memory in the SPA; the refresh token only ever lives in an httpOnly cookie. */
 function sendSession(res: Response, session: AuthSession) {
   res.cookie(REFRESH_COOKIE, session.refreshToken, cookieOptions());
-  sendData(res, { accessToken: session.accessToken, expiresAt: session.expiresAt, user: session.user });
+  sendData(res, {
+    accessToken: session.accessToken,
+    expiresAt: session.expiresAt,
+    user: session.user,
+  });
 }
 
 function clearSession(res: Response) {
@@ -42,7 +46,9 @@ export const authController = {
     const token: unknown = req.cookies?.[REFRESH_COOKIE];
     if (typeof token !== 'string' || !token) {
       clearSession(res);
-      res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Please sign in to continue.' } });
+      res
+        .status(401)
+        .json({ error: { code: 'UNAUTHORIZED', message: 'Please sign in to continue.' } });
       return;
     }
     try {

@@ -5,7 +5,13 @@ import { escapeLike } from './profiles.repository.js';
 import type { Row } from './mappers.js';
 
 export type ComplaintStatus = Row<'complaints'>['status'];
-export const COMPLAINT_CATEGORIES = ['academic', 'technical', 'facility', 'conduct', 'other'] as const;
+export const COMPLAINT_CATEGORIES = [
+  'academic',
+  'technical',
+  'facility',
+  'conduct',
+  'other',
+] as const;
 export type ComplaintCategory = (typeof COMPLAINT_CATEGORIES)[number];
 
 export interface Complaint {
@@ -44,7 +50,12 @@ function toRecord(row: ComplaintRow): ComplaintRecord {
   return {
     id: row.id,
     raisedBy: row.raiser
-      ? { id: row.raiser.id, fullName: row.raiser.full_name, email: row.raiser.email, role: row.raiser.role }
+      ? {
+          id: row.raiser.id,
+          fullName: row.raiser.full_name,
+          email: row.raiser.email,
+          role: row.raiser.role,
+        }
       : null,
     raisedById: row.raised_by,
     course: row.course,
@@ -124,14 +135,21 @@ export const complaintsRepository = {
   },
 
   async findById(db: Db, id: string): Promise<ComplaintRecord | null> {
-    const row = unwrap(await db.from('complaints').select(SELECT).eq('id', id).maybeSingle(), 'Complaint');
+    const row = unwrap(
+      await db.from('complaints').select(SELECT).eq('id', id).maybeSingle(),
+      'Complaint',
+    );
     return row ? toRecord(row as unknown as ComplaintRow) : null;
   },
 
   async update(
     db: Db,
     id: string,
-    patch: { status?: ComplaintStatus | undefined; adminResponse?: string | undefined; followUp?: string | undefined },
+    patch: {
+      status?: ComplaintStatus | undefined;
+      adminResponse?: string | undefined;
+      followUp?: string | undefined;
+    },
   ): Promise<ComplaintRecord> {
     const row = unwrapRequired(
       await db
@@ -153,7 +171,10 @@ export const complaintsRepository = {
     const statuses: ComplaintStatus[] = ['open', 'in_review', 'resolved', 'rejected'];
     const counts = await Promise.all(
       statuses.map(async (status) => {
-        const result = await db.from('complaints').select('id', { count: 'exact', head: true }).eq('status', status);
+        const result = await db
+          .from('complaints')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', status);
         unwrap(result, 'Complaint');
         return [status, result.count ?? 0] as const;
       }),

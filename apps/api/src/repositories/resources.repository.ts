@@ -63,7 +63,10 @@ export const resourcesRepository = {
   },
 
   async findById(db: Db, id: string): Promise<ResourceRecord | null> {
-    const row = unwrap(await db.from('resources').select(SELECT).eq('id', id).maybeSingle(), 'Resource');
+    const row = unwrap(
+      await db.from('resources').select(SELECT).eq('id', id).maybeSingle(),
+      'Resource',
+    );
     return row ? toRecord(row as unknown as ResourceRow) : null;
   },
 
@@ -101,7 +104,10 @@ export const resourcesRepository = {
   },
 
   async delete(db: Db, id: string): Promise<boolean> {
-    const rows = unwrapList(await db.from('resources').delete().eq('id', id).select('id'), 'Resource');
+    const rows = unwrapList(
+      await db.from('resources').delete().eq('id', id).select('id'),
+      'Resource',
+    );
     return rows.length > 0;
   },
 };

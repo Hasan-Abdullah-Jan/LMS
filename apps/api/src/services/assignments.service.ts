@@ -57,7 +57,10 @@ export const assignmentsService = {
       return {
         total,
         rows: rows.map((assignment) => {
-          const mine = submissions.find((s) => s.assignmentId === assignment.id && s.studentId === ctx.user.id) ?? null;
+          const mine =
+            submissions.find(
+              (s) => s.assignmentId === assignment.id && s.studentId === ctx.user.id,
+            ) ?? null;
           return {
             ...toAssignment(assignment),
             status: submissionStatus(assignment, mine),
@@ -111,7 +114,12 @@ export const assignmentsService = {
       const verified = await verifyUpload(file, 'resources', MAX_RESOURCE_BYTES);
       attachmentPath = buildStoragePath(`${courseId}/assignments`, verified.fileName);
       attachmentName = verified.fileName;
-      await storageRepository.upload('resources', attachmentPath, verified.buffer, verified.mimeType);
+      await storageRepository.upload(
+        'resources',
+        attachmentPath,
+        verified.buffer,
+        verified.mimeType,
+      );
     }
     try {
       const assignment = await assignmentsRepository.insert(ctx.db, {
@@ -151,7 +159,8 @@ export const assignmentsService = {
     await assertCourseStaff(ctx, assignment.courseId);
     const submissions = await assignmentsRepository.submissionsForAssignments(supabaseAdmin, [id]);
     if (!(await assignmentsRepository.delete(ctx.db, id))) throw forbidden();
-    if (assignment.attachmentPath) await storageRepository.remove('resources', [assignment.attachmentPath]);
+    if (assignment.attachmentPath)
+      await storageRepository.remove('resources', [assignment.attachmentPath]);
     await storageRepository.remove(
       'submissions',
       submissions.map((s) => s.filePath).filter((path): path is string => Boolean(path)),
@@ -166,7 +175,11 @@ export const assignmentsService = {
     const assignment = await requireAssignment(id);
     await courseRole(ctx, assignment.courseId);
     if (!assignment.attachmentPath || !assignment.attachmentName) throw notFound('Attachment');
-    const url = await storageRepository.signedUrl('resources', assignment.attachmentPath, assignment.attachmentName);
+    const url = await storageRepository.signedUrl(
+      'resources',
+      assignment.attachmentPath,
+      assignment.attachmentName,
+    );
     return { url, fileName: assignment.attachmentName, expiresIn: 60 };
   },
 
@@ -237,7 +250,12 @@ export const assignmentsService = {
     const rows = students.map((student) => {
       const submission = submissions.find((s) => s.studentId === student.id) ?? null;
       return {
-        student: { id: student.id, fullName: student.fullName, email: student.email, rollNo: student.rollNo },
+        student: {
+          id: student.id,
+          fullName: student.fullName,
+          email: student.email,
+          rollNo: student.rollNo,
+        },
         status: submissionStatus(assignment, submission),
         submission: submission ? toSubmission(submission) : null,
       };
@@ -245,7 +263,11 @@ export const assignmentsService = {
     return { assignment: toAssignment(assignment), rows };
   },
 
-  async grade(ctx: RequestContext, submissionId: string, input: { marks: number; feedback: string | null }) {
+  async grade(
+    ctx: RequestContext,
+    submissionId: string,
+    input: { marks: number; feedback: string | null },
+  ) {
     const submission = await assignmentsRepository.findSubmissionById(supabaseAdmin, submissionId);
     if (!submission) throw notFound('Submission');
     const assignment = await requireAssignment(submission.assignmentId);
@@ -276,7 +298,11 @@ export const assignmentsService = {
     const role = await courseRole(ctx, assignment.courseId);
     if (role === 'student' && submission.studentId !== ctx.user.id) throw notFound('Submission');
     if (!submission.filePath || !submission.fileName) throw notFound('File');
-    const url = await storageRepository.signedUrl('submissions', submission.filePath, submission.fileName);
+    const url = await storageRepository.signedUrl(
+      'submissions',
+      submission.filePath,
+      submission.fileName,
+    );
     return { url, fileName: submission.fileName, expiresIn: 60 };
   },
 };

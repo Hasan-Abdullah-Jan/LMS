@@ -59,7 +59,9 @@ function toRowPatch(patch: ProfilePatch) {
     ...(patch.role !== undefined && { role: patch.role }),
     ...(patch.rollNo !== undefined && { roll_no: patch.rollNo }),
     ...(patch.isActive !== undefined && { is_active: patch.isActive }),
-    ...(patch.mustChangePassword !== undefined && { must_change_password: patch.mustChangePassword }),
+    ...(patch.mustChangePassword !== undefined && {
+      must_change_password: patch.mustChangePassword,
+    }),
   };
 }
 
@@ -160,8 +162,14 @@ export const profilesRepository = {
 /** How many course links (teaching + enrollments) a user has. Used to guard role changes. */
 export async function countCourseLinks(db: Db, userId: string): Promise<number> {
   const [teaching, enrolled] = await Promise.all([
-    db.from('course_teachers').select('course_id', { count: 'exact', head: true }).eq('teacher_id', userId),
-    db.from('enrollments').select('course_id', { count: 'exact', head: true }).eq('student_id', userId),
+    db
+      .from('course_teachers')
+      .select('course_id', { count: 'exact', head: true })
+      .eq('teacher_id', userId),
+    db
+      .from('enrollments')
+      .select('course_id', { count: 'exact', head: true })
+      .eq('student_id', userId),
   ]);
   unwrap(teaching, 'Course');
   unwrap(enrolled, 'Course');

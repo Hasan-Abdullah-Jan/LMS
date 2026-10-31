@@ -1,6 +1,11 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { conflict, forbidden, notFound, unprocessable } from '../lib/errors.js';
-import { buildStoragePath, MAX_COMPLAINT_ATTACHMENT_BYTES, verifyUpload, type UploadedFile } from '../lib/files.js';
+import {
+  buildStoragePath,
+  MAX_COMPLAINT_ATTACHMENT_BYTES,
+  verifyUpload,
+  type UploadedFile,
+} from '../lib/files.js';
 import { auditRepository } from '../repositories/audit.repository.js';
 import {
   complaintsRepository,
@@ -41,10 +46,16 @@ async function requireVisible(ctx: RequestContext, id: string) {
 export const complaintsService = {
   async create(
     ctx: RequestContext,
-    input: { category: ComplaintCategory; subject: string; description: string; courseId: string | null },
+    input: {
+      category: ComplaintCategory;
+      subject: string;
+      description: string;
+      courseId: string | null;
+    },
     file: UploadedFile | undefined,
   ) {
-    if (ctx.user.role === 'admin') throw forbidden('Administrators resolve complaints rather than file them.');
+    if (ctx.user.role === 'admin')
+      throw forbidden('Administrators resolve complaints rather than file them.');
     if (input.courseId) await courseRole(ctx, input.courseId);
 
     let attachmentPath: string | null = null;
@@ -53,7 +64,12 @@ export const complaintsService = {
       const verified = await verifyUpload(file, 'complaints', MAX_COMPLAINT_ATTACHMENT_BYTES);
       attachmentPath = buildStoragePath(ctx.user.id, verified.fileName);
       attachmentName = verified.fileName;
-      await storageRepository.upload('complaint-attachments', attachmentPath, verified.buffer, verified.mimeType);
+      await storageRepository.upload(
+        'complaint-attachments',
+        attachmentPath,
+        verified.buffer,
+        verified.mimeType,
+      );
     }
     try {
       const record = await complaintsRepository.insert(ctx.db, {
@@ -71,7 +87,10 @@ export const complaintsService = {
 
   async mine(ctx: RequestContext, filters: ComplaintFilters) {
     if (ctx.user.role === 'admin') throw forbidden('Administrators do not file complaints.');
-    const { rows, total } = await complaintsRepository.list(ctx.db, { ...filters, raisedBy: ctx.user.id });
+    const { rows, total } = await complaintsRepository.list(ctx.db, {
+      ...filters,
+      raisedBy: ctx.user.id,
+    });
     return { rows: rows.map(toComplaint), total };
   },
 
@@ -85,16 +104,21 @@ export const complaintsService = {
   },
 
   /** Admin review. A response is required to resolve or reject (422). The complainant is notified. */
-  async adminUpdate(ctx: RequestContext, id: string, input: { status?: ComplaintStatus | undefined; adminResponse?: string | undefined }) {
+  async adminUpdate(
+    ctx: RequestContext,
+    id: string,
+    input: { status?: ComplaintStatus | undefined; adminResponse?: string | undefined },
+  ) {
     const complaint = await complaintsRepository.findById(ctx.db, id);
     if (!complaint) throw notFound('Complaint');
 
     const nextStatus = input.status ?? complaint.status;
     const statusChanges = nextStatus !== complaint.status;
     if (statusChanges && !ALLOWED_TRANSITIONS[complaint.status].includes(nextStatus)) {
-      throw unprocessable(`A complaint that is ${STATUS_LABEL[complaint.status]} cannot be moved to ${STATUS_LABEL[nextStatus]}.`, [
-        { path: 'status', message: 'Invalid status change.' },
-      ]);
+      throw unprocessable(
+        `A complaint that is ${STATUS_LABEL[complaint.status]} cannot be moved to ${STATUS_LABEL[nextStatus]}.`,
+        [{ path: 'status', message: 'Invalid status change.' }],
+      );
     }
     if (!statusChanges && ['resolved', 'rejected'].includes(complaint.status)) {
       throw conflict('This complaint is closed and can no longer be changed.');
@@ -102,7 +126,10 @@ export const complaintsService = {
     const response = input.adminResponse ?? complaint.adminResponse ?? '';
     if ((nextStatus === 'resolved' || nextStatus === 'rejected') && !response.trim()) {
       throw unprocessable('A response is required to resolve or reject a complaint.', [
-        { path: 'adminResponse', message: 'A response is required to resolve or reject a complaint.' },
+        {
+          path: 'adminResponse',
+          message: 'A response is required to resolve or reject a complaint.',
+        },
       ]);
     }
 
@@ -138,7 +165,11 @@ export const complaintsService = {
   async attachmentUrl(ctx: RequestContext, id: string) {
     const complaint = await requireVisible(ctx, id);
     if (!complaint.attachmentPath || !complaint.attachmentName) throw notFound('Attachment');
-    const url = await storageRepository.signedUrl('complaint-attachments', complaint.attachmentPath, complaint.attachmentName);
+    const url = await storageRepository.signedUrl(
+      'complaint-attachments',
+      complaint.attachmentPath,
+      complaint.attachmentName,
+    );
     return { url, fileName: complaint.attachmentName, expiresIn: 60 };
   },
 };

@@ -13,7 +13,8 @@ export function singleFile(field: string, maxBytes: number) {
   }).single(field);
 
   return (req: Request, res: Response, next: NextFunction) => {
-    (req as Request & { uploadLimitLabel?: string }).uploadLimitLabel = `${Math.round(maxBytes / MB)} MB`;
+    (req as Request & { uploadLimitLabel?: string }).uploadLimitLabel =
+      `${Math.round(maxBytes / MB)} MB`;
     parser(req, res, next);
   };
 }

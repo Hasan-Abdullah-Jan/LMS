@@ -27,7 +27,13 @@ const toNotification = (row: Row<'notifications'>): Notification => ({
 
 export const notificationsRepository = {
   /** Server-side fan-out (service role); failures are logged, not thrown. */
-  async create(input: { userId: string; kind: string; title: string; body?: string; link?: string }) {
+  async create(input: {
+    userId: string;
+    kind: string;
+    title: string;
+    body?: string;
+    link?: string;
+  }) {
     const { error } = await supabaseAdmin.from('notifications').insert({
       user_id: input.userId,
       kind: input.kind,

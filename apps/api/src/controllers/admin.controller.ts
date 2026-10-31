@@ -45,7 +45,10 @@ export const adminController = {
   },
   async resetUserPassword(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
-    sendData(res, await usersService.resetPassword(ctx(req), id, validate(adminResetPasswordSchema, req.body)));
+    sendData(
+      res,
+      await usersService.resetPassword(ctx(req), id, validate(adminResetPasswordSchema, req.body)),
+    );
   },
 
   // courses
@@ -59,11 +62,18 @@ export const adminController = {
     sendData(res, await coursesService.getForAdmin(ctx(req), id));
   },
   async createCourse(req: Request, res: Response) {
-    sendData(res, await coursesService.create(ctx(req), validate(createCourseSchema, req.body)), 201);
+    sendData(
+      res,
+      await coursesService.create(ctx(req), validate(createCourseSchema, req.body)),
+      201,
+    );
   },
   async updateCourse(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
-    sendData(res, await coursesService.update(ctx(req), id, validate(updateCourseSchema, req.body)));
+    sendData(
+      res,
+      await coursesService.update(ctx(req), id, validate(updateCourseSchema, req.body)),
+    );
   },
   async setTeachers(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
@@ -91,7 +101,14 @@ export const adminController = {
   },
   async updateComplaint(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
-    sendData(res, await complaintsService.adminUpdate(ctx(req), id, validate(adminUpdateComplaintSchema, req.body)));
+    sendData(
+      res,
+      await complaintsService.adminUpdate(
+        ctx(req),
+        id,
+        validate(adminUpdateComplaintSchema, req.body),
+      ),
+    );
   },
 
   // audit

@@ -60,11 +60,17 @@ export const dashboardService = {
     if (role === 'student') {
       await quizzesRepository.finalizeExpired();
       const [submissions, openQuizzes, marks] = await Promise.all([
-        assignmentsRepository.submissionsForAssignments(ctx.db, upcomingAssignments.map((a) => a.id)),
+        assignmentsRepository.submissionsForAssignments(
+          ctx.db,
+          upcomingAssignments.map((a) => a.id),
+        ),
         quizzesRepository.openForCourses(ctx.db, courseIds, at.toISOString()),
         marksRepository.forStudent(ctx.db, id),
       ]);
-      const attempts = await quizzesRepository.attemptsForQuizzes(ctx.db, openQuizzes.map((q) => q.id));
+      const attempts = await quizzesRepository.attemptsForQuizzes(
+        ctx.db,
+        openQuizzes.map((q) => q.id),
+      );
       const recentMarks = marks
         .filter((m) => m.obtained !== null && m.gradedAt)
         .sort((a, b) => (b.gradedAt ?? '').localeCompare(a.gradedAt ?? ''))
@@ -89,9 +95,14 @@ export const dashboardService = {
 
     // teacher
     const assignments = await assignmentsRepository.idsForCourses(ctx.db, courseIds);
-    const ungraded = await assignmentsRepository.ungraded(ctx.db, assignments.map((a) => a.id));
+    const ungraded = await assignmentsRepository.ungraded(
+      ctx.db,
+      assignments.map((a) => a.id),
+    );
     const students = ungraded.length
-      ? await profilesRepository.findByIds(supabaseAdmin, [...new Set(ungraded.map((s) => s.studentId))])
+      ? await profilesRepository.findByIds(supabaseAdmin, [
+          ...new Set(ungraded.map((s) => s.studentId)),
+        ])
       : [];
     return {
       role,
@@ -108,7 +119,10 @@ export const dashboardService = {
           course: courseLabel(assignment.courseId),
         };
       }),
-      upcomingAssignments: upcomingAssignments.map((a) => ({ ...toAssignment(a), course: courseLabel(a.courseId) })),
+      upcomingAssignments: upcomingAssignments.map((a) => ({
+        ...toAssignment(a),
+        course: courseLabel(a.courseId),
+      })),
       announcements,
     };
   },

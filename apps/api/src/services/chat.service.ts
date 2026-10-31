@@ -17,7 +17,8 @@ export const chatService = {
   /** Teachers of the course and enrolled students can post. Admins read only. */
   async send(ctx: RequestContext, courseId: string, body: string) {
     const role = await courseRole(ctx, courseId);
-    if (role === 'admin') throw forbidden('Administrators can read classroom chats but not post in them.');
+    if (role === 'admin')
+      throw forbidden('Administrators can read classroom chats but not post in them.');
     return chatRepository.insert(ctx.db, { courseId, senderId: ctx.user.id, body });
   },
 
@@ -29,15 +30,22 @@ export const chatService = {
     if (message.deletedAt) return message;
 
     const isSender = message.senderId === ctx.user.id;
-    const withinWindow = now().getTime() - new Date(message.createdAt).getTime() <= SENDER_DELETE_WINDOW_MS;
+    const withinWindow =
+      now().getTime() - new Date(message.createdAt).getTime() <= SENDER_DELETE_WINDOW_MS;
     if (role === 'student' && !(isSender && withinWindow)) {
-      throw forbidden(isSender ? 'Messages can only be deleted within 5 minutes of sending.' : 'You can only delete your own messages.');
+      throw forbidden(
+        isSender
+          ? 'Messages can only be deleted within 5 minutes of sending.'
+          : 'You can only delete your own messages.',
+      );
     }
     if (role === 'teacher' || role === 'admin' || (isSender && withinWindow)) {
       const deleted = await chatRepository.softDelete(ctx.db, id, ctx.user.id);
       if (!deleted) throw forbidden('This message can no longer be deleted.');
       if (!isSender) {
-        await auditRepository.record(ctx.user.id, 'chat.delete', 'chat_message', id, { courseId: message.courseId });
+        await auditRepository.record(ctx.user.id, 'chat.delete', 'chat_message', id, {
+          courseId: message.courseId,
+        });
       }
       return deleted;
     }

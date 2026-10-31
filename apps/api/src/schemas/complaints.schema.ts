@@ -4,7 +4,10 @@ import { COMPLAINT_CATEGORIES } from '../repositories/complaints.repository.js';
 import { optionalText, requiredText, uuidSchema } from './common.schema.js';
 
 export const categorySchema = z.enum(COMPLAINT_CATEGORIES, 'Choose a category.');
-export const statusSchema = z.enum(['open', 'in_review', 'resolved', 'rejected'], 'Choose a valid status.');
+export const statusSchema = z.enum(
+  ['open', 'in_review', 'resolved', 'rejected'],
+  'Choose a valid status.',
+);
 
 /** Multipart form fields. */
 export const createComplaintSchema = z.object({
@@ -26,7 +29,11 @@ export const complaintsQuery = paginationSchema.extend({
 export const adminUpdateComplaintSchema = z
   .object({
     status: statusSchema.optional(),
-    adminResponse: z.string().trim().max(5000, 'Response must be at most 5,000 characters.').optional(),
+    adminResponse: z
+      .string()
+      .trim()
+      .max(5000, 'Response must be at most 5,000 characters.')
+      .optional(),
   })
   .refine((value) => value.status !== undefined || value.adminResponse !== undefined, {
     message: 'Provide a status or a response.',

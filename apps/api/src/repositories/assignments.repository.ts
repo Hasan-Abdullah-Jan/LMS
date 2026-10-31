@@ -106,14 +106,22 @@ export const assignmentsRepository = {
 
   async listAllByCourse(db: Db, courseId: string): Promise<AssignmentRecord[]> {
     const rows = unwrapList(
-      await db.from('assignments').select('*').eq('course_id', courseId).order('due_at').limit(1000),
+      await db
+        .from('assignments')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('due_at')
+        .limit(1000),
       'Assignment',
     );
     return rows.map(toAssignmentRecord);
   },
 
   async findById(db: Db, id: string): Promise<AssignmentRecord | null> {
-    const row = unwrap(await db.from('assignments').select('*').eq('id', id).maybeSingle(), 'Assignment');
+    const row = unwrap(
+      await db.from('assignments').select('*').eq('id', id).maybeSingle(),
+      'Assignment',
+    );
     return row ? toAssignmentRecord(row) : null;
   },
 
@@ -167,12 +175,20 @@ export const assignmentsRepository = {
   },
 
   async delete(db: Db, id: string): Promise<boolean> {
-    const rows = unwrapList(await db.from('assignments').delete().eq('id', id).select('id'), 'Assignment');
+    const rows = unwrapList(
+      await db.from('assignments').delete().eq('id', id).select('id'),
+      'Assignment',
+    );
     return rows.length > 0;
   },
 
   /** Assignments due between now and `until` across the given courses. */
-  async upcoming(db: Db, courseIds: string[], from: string, until: string): Promise<AssignmentRecord[]> {
+  async upcoming(
+    db: Db,
+    courseIds: string[],
+    from: string,
+    until: string,
+  ): Promise<AssignmentRecord[]> {
     if (courseIds.length === 0) return [];
     const rows = unwrapList(
       await db
@@ -223,7 +239,11 @@ export const assignmentsRepository = {
     return rows.map(toSubmissionRecord);
   },
 
-  async findSubmission(db: Db, assignmentId: string, studentId: string): Promise<SubmissionRecord | null> {
+  async findSubmission(
+    db: Db,
+    assignmentId: string,
+    studentId: string,
+  ): Promise<SubmissionRecord | null> {
     const row = unwrap(
       await db
         .from('submissions')
@@ -237,7 +257,10 @@ export const assignmentsRepository = {
   },
 
   async findSubmissionById(db: Db, id: string): Promise<SubmissionRecord | null> {
-    const row = unwrap(await db.from('submissions').select('*').eq('id', id).maybeSingle(), 'Submission');
+    const row = unwrap(
+      await db.from('submissions').select('*').eq('id', id).maybeSingle(),
+      'Submission',
+    );
     return row ? toSubmissionRecord(row) : null;
   },
 

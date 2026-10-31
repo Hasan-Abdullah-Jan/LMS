@@ -13,7 +13,9 @@ export interface ChatMessage {
   deletedAt: string | null;
 }
 
-type MessageRow = Row<'chat_messages'> & { sender: { id: string; full_name: string; role: string } | null };
+type MessageRow = Row<'chat_messages'> & {
+  sender: { id: string; full_name: string; role: string } | null;
+};
 
 const SELECT = '*, sender:profiles!chat_messages_sender_id_fkey(id, full_name, role)';
 
@@ -21,7 +23,9 @@ function toMessage(row: MessageRow): ChatMessage {
   return {
     id: row.id,
     courseId: row.course_id,
-    sender: row.sender ? { id: row.sender.id, fullName: row.sender.full_name, role: row.sender.role } : null,
+    sender: row.sender
+      ? { id: row.sender.id, fullName: row.sender.full_name, role: row.sender.role }
+      : null,
     senderId: row.sender_id,
     body: row.deleted_at ? null : row.body,
     createdAt: row.created_at,
@@ -45,11 +49,17 @@ export const chatRepository = {
   },
 
   async findById(db: Db, id: string): Promise<ChatMessage | null> {
-    const row = unwrap(await db.from('chat_messages').select(SELECT).eq('id', id).maybeSingle(), 'Message');
+    const row = unwrap(
+      await db.from('chat_messages').select(SELECT).eq('id', id).maybeSingle(),
+      'Message',
+    );
     return row ? toMessage(row as unknown as MessageRow) : null;
   },
 
-  async insert(db: Db, input: { courseId: string; senderId: string; body: string }): Promise<ChatMessage> {
+  async insert(
+    db: Db,
+    input: { courseId: string; senderId: string; body: string },
+  ): Promise<ChatMessage> {
     const row = unwrapRequired(
       await db
         .from('chat_messages')

@@ -19,9 +19,15 @@ export function parseEmailList(input: string): ParsedEmails {
   const emails: string[] = [];
 
   const tokens = input
-    .replace(/^﻿/, '')
+    .replace(/^\uFEFF/, '')
     .split(/[\r\n,;\t]+/)
-    .map((token) => token.trim().replace(/^["']|["']$/g, '').trim().toLowerCase())
+    .map((token) =>
+      token
+        .trim()
+        .replace(/^["']|["']$/g, '')
+        .trim()
+        .toLowerCase(),
+    )
     .filter(Boolean);
 
   for (const token of tokens) {
@@ -50,5 +56,5 @@ function escapeCell(value: string | number | null | undefined): string {
 
 /** Build an Excel-friendly CSV (UTF-8 BOM + CRLF). */
 export function toCsv(rows: Array<Array<string | number | null | undefined>>): string {
-  return `﻿${rows.map((row) => row.map(escapeCell).join(',')).join('\r\n')}\r\n`;
+  return `\uFEFF${rows.map((row) => row.map(escapeCell).join(',')).join('\r\n')}\r\n`;
 }

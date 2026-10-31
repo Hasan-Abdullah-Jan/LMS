@@ -77,14 +77,21 @@ export const coursesController = {
   },
   async createQuiz(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
-    sendData(res, await quizzesService.create(ctx(req), id, validate(createQuizSchema, req.body)), 201);
+    sendData(
+      res,
+      await quizzesService.create(ctx(req), id, validate(createQuizSchema, req.body)),
+      201,
+    );
   },
 
   async listMessages(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
     const { before, limit } = validate(messagesQuery, req.query);
     const { messages, hasMore } = await chatService.history(ctx(req), id, before, limit);
-    res.json({ data: messages, meta: { hasMore, nextBefore: hasMore ? (messages[0]?.createdAt ?? null) : null } });
+    res.json({
+      data: messages,
+      meta: { hasMore, nextBefore: hasMore ? (messages[0]?.createdAt ?? null) : null },
+    });
   },
   async sendMessage(req: Request, res: Response) {
     const { id } = validate(idParams, req.params);
