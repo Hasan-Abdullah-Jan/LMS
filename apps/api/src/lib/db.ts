@@ -26,24 +26,24 @@ export function toAppError(error: PostgrestError, entity = 'Resource'): AppError
 }
 
 interface QueryResult<T> {
-  data: T | null;
+  data: T;
   error: PostgrestError | null;
 }
 
 /** Throw on error and return data (which may be null for maybeSingle()). */
-export function unwrap<T>(result: QueryResult<T>, entity?: string): T | null {
+export function unwrap<T>(result: QueryResult<T>, entity?: string): T {
   if (result.error) throw toAppError(result.error, entity);
   return result.data;
 }
 
 /** Throw on error or missing data. */
-export function unwrapRequired<T>(result: QueryResult<T>, entity?: string): T {
+export function unwrapRequired<T>(result: QueryResult<T>, entity?: string): NonNullable<T> {
   const data = unwrap(result, entity);
   if (data === null || data === undefined) throw notFound(entity);
   return data;
 }
 
 /** Throw on error and return a list (never null). */
-export function unwrapList<T>(result: QueryResult<T[]>, entity?: string): T[] {
+export function unwrapList<T>(result: QueryResult<T[] | null>, entity?: string): T[] {
   return unwrap(result, entity) ?? [];
 }

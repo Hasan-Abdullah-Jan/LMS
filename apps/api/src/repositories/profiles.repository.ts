@@ -156,3 +156,14 @@ export const profilesRepository = {
     return counts;
   },
 };
+
+/** How many course links (teaching + enrollments) a user has. Used to guard role changes. */
+export async function countCourseLinks(db: Db, userId: string): Promise<number> {
+  const [teaching, enrolled] = await Promise.all([
+    db.from('course_teachers').select('course_id', { count: 'exact', head: true }).eq('teacher_id', userId),
+    db.from('enrollments').select('course_id', { count: 'exact', head: true }).eq('student_id', userId),
+  ]);
+  unwrap(teaching, 'Course');
+  unwrap(enrolled, 'Course');
+  return (teaching.count ?? 0) + (enrolled.count ?? 0);
+}

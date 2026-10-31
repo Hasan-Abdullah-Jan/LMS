@@ -10,7 +10,7 @@ export function sendData<T>(res: Response, data: T, status = 200): void {
   res.status(status).json({ data });
 }
 
-export function sendPage<T>(res: Response, data: T[], meta: PageMeta): void {
+export function sendPage(res: Response, data: readonly unknown[], meta: PageMeta): void {
   res.status(200).json({ data, meta });
 }
 
