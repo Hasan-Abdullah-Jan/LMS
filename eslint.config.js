@@ -1,13 +1,36 @@
-import tsParser from '@typescript-eslint/parser';
-import tsPlugin from '@typescript-eslint/eslint-plugin';
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import tseslint from 'typescript-eslint';
 
-export default [
-  { ignores: ['**/dist/**', '**/node_modules/**'] },
+export default tseslint.config(
   {
-    files: ['**/*.ts', '**/*.tsx'],
-    languageOptions: { parser: tsParser, parserOptions: { ecmaVersion: 'latest', sourceType: 'module' } },
-    plugins: { '@typescript-eslint': tsPlugin },
-    rules: { ...tsPlugin.configs.recommended.rules },
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
-];
-
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ['apps/api/**/*.ts', 'e2e/**/*.ts', '*.config.{js,ts}'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    languageOptions: { globals: globals.browser },
+    plugins: { 'react-hooks': reactHooks },
+    rules: { ...reactHooks.configs.recommended.rules },
+  },
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+);
