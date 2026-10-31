@@ -351,21 +351,22 @@ const cases: Case[] = [
   { method: 'post', path: '/api/notifications/read-all', allowed: 'student', denied: null },
 ];
 
+/** Build the request for a case, optionally as a signed-in role. */
+function call(method: Case['method'], path: string, role?: Role) {
+  const agent = request(app);
+  const req = agent[method](path);
+  return role ? req.set('Authorization', `Bearer ${role}`) : req;
+}
+
 describe.each(cases)('$method $path', ({ method, path, allowed, denied, body }) => {
   it(`allows ${allowed}`, async () => {
-    const res = await request(app)
-      [method](path)
-      .set('Authorization', `Bearer ${allowed}`)
-      .send(body);
+    const res = await call(method, path, allowed).send(body);
     expect(res.status, JSON.stringify(res.body)).toBeLessThan(300);
   });
 
   if (denied) {
     it(`rejects ${denied} with 403`, async () => {
-      const res = await request(app)
-        [method](path)
-        .set('Authorization', `Bearer ${denied}`)
-        .send(body);
+      const res = await call(method, path, denied).send(body);
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('FORBIDDEN');
     });
