@@ -1,23 +1,317 @@
-import { useState } from 'react';
-import { useQuery,useQueryClient } from '@tanstack/react-query';
-import { FileText,Paperclip,Send,ShieldCheck } from 'lucide-react';
-import { api,ApiError } from '../../lib/api';
-import { useAuth } from '../auth/AuthProvider';
-type Complaint={id:string;courseId:string|null;category:string;subject:string;description:string;attachmentPath:string|null;status:string;response:string|null;createdAt:string;updatedAt:string;reporter?:{full_name:string;email:string}};
-const statuses=['open','in_review','resolved','rejected'];
-const label=(s:string)=>s.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
-export default function ComplaintsPage(){const {profile}=useAuth();const admin=profile?.role==='admin';const [status,setStatus]=useState('all');const [error,setError]=useState('');const [file,setFile]=useState<File|null>(null);const [busy,setBusy]=useState(false);const qc=useQueryClient();
- const key=['complaints',admin,status];const query=useQuery({queryKey:key,queryFn:()=>api<{data:Complaint[];meta:{total:number}}> (admin?`/admin/complaints?page=1&pageSize=100${status==='all'?'':'&status='+status}`:'/complaints/mine?page=1&pageSize=100')});const rows=query.data?.data??[];
- const unread=useQuery({queryKey:['complaints','unread'],enabled:!admin,queryFn:()=>api<{data:{unreadCount:number}}>('/complaints/unread-count')}).data?.data.unreadCount??0;
- const [category,setCategory]=useState('academic');const [subject,setSubject]=useState('');const [description,setDescription]=useState('');
- const submit=async(e:React.FormEvent)=>{e.preventDefault();setError('');setBusy(true);try{const body=new FormData();body.set('category',category);body.set('subject',subject);body.set('description',description);if(file)body.set('file',file);await api('/complaints',{method:'POST',body});setSubject('');setDescription('');setFile(null);await qc.invalidateQueries({queryKey:['complaints']});}catch(e){setError(e instanceof ApiError?e.message:'Could not submit the complaint.')}finally{setBusy(false)}};
- const update=async(c:Complaint,next:string,response:string)=>{try{await api(`/admin/complaints/${c.id}`,{method:'PATCH',body:JSON.stringify({status:next,response})});await qc.invalidateQueries({queryKey:['complaints']})}catch(e){setError(e instanceof ApiError?e.message:'Could not update complaint.')}};
- const attachment=async(c:Complaint)=>{try{const r=await api<{data:{url:string}}>('/complaints/'+c.id+'/attachment');window.open(r.data.url,'_blank','noopener,noreferrer')}catch{setError('Could not open the attachment.')}};
- const read=async(c:Complaint)=>{if(!admin&&c.status!=='open')await api('/complaints/read',{method:'POST',body:JSON.stringify({complaintId:c.id})}).then(()=>qc.invalidateQueries({queryKey:['complaints','unread']})).catch(()=>undefined)};
- return <section className="complaints-page"><div className="learning-heading"><div><span className="eyebrow">{admin?'STUDENT SUPPORT':'PRIVATE SUPPORT'}</span><h1>{admin?'Complaint queue':'My complaints'}</h1><p>{admin?'Review concerns and keep each report moving through a clear process.':'Send a private message to the learning support team and follow its progress.'}</p></div>{!admin&&unread>0&&<span className="complaint-unread"><ShieldCheck size={16}/>{unread} status update{unread===1?'':'s'}</span>}</div>
- {!admin&&<form className="surface-card complaint-form" onSubmit={submit}><h2><FileText size={18}/> Submit a complaint</h2><div className="complaint-form-grid"><label>Category<select value={category} onChange={e=>setCategory(e.target.value)}>{['academic','technical','account','facilities','other'].map(x=><option key={x} value={x}>{label(x)}</option>)}</select></label><label>Subject<input value={subject} onChange={e=>setSubject(e.target.value)} minLength={4} maxLength={180} required placeholder="A short description"/></label></div><label>Details<textarea value={description} onChange={e=>setDescription(e.target.value)} minLength={10} maxLength={10000} rows={4} required placeholder="Tell us what happened and how we can help."/></label><div className="complaint-form-footer"><label className="attachment-picker"><Paperclip size={16}/><span>{file?file.name:'Attach PDF or image (10 MB max)'}</span><input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" onChange={e=>setFile(e.target.files?.[0]??null)}/></label><button className="button button-primary" disabled={busy}>{busy?'Sending…':<>Send privately <Send size={15}/></>}</button></div>{error&&<div className="alert alert-error">{error}</div>}</form>}
- {admin&&<div className="complaint-filters"><label>Filter status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All statuses</option>{statuses.map(s=><option key={s} value={s}>{label(s)}</option>)}</select></label><span>{query.data?.meta.total??0} reports</span></div>}
- {query.isLoading?<div className="table-state">Loading complaints…</div>:query.isError?<div className="table-state error-state">Could not load complaints. <button onClick={()=>void query.refetch()}>Try again</button></div>:!rows.length?<div className="surface-card learning-empty"><ShieldCheck size={25}/><strong>{admin?'No reports in this queue':'No complaints yet'}</strong><span>{admin?'Try another filter.':'New complaints and their responses will appear here.'}</span></div>:<div className="complaint-list">{rows.map(c=><article className="surface-card complaint-card" key={c.id} onMouseEnter={()=>void read(c)}><div className="complaint-top"><div><span className="eyebrow">{label(c.category)}{admin&&c.reporter?` · ${c.reporter.full_name}`:''}</span><h2>{c.subject}</h2></div><span className={`status-pill status-${c.status}`}>{label(c.status)}</span></div><p>{c.description}</p><div className="complaint-meta"><span>Submitted {new Date(c.createdAt).toLocaleDateString()}</span>{c.attachmentPath&&<button className="text-link" onClick={()=>void attachment(c)}><Paperclip size={14}/> View attachment</button>}</div>{c.response&&<div className="complaint-response"><strong>Support response</strong><p>{c.response}</p><span>Updated {new Date(c.updatedAt).toLocaleDateString()}</span></div>}{admin&&<AdminActions complaint={c} onUpdate={update}/>}</article>)}</div>}
- </section>;
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronRight, Plus, ShieldAlert } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { ComplaintStatusBadge } from '@/components/common/badges';
+import { COMPLAINT_ACCEPT, FileDropzone } from '@/components/common/FileDropzone';
+import { FormField } from '@/components/common/misc';
+import { PageHeader, Pagination } from '@/components/common/page';
+import { EmptyState, ErrorState, ListSkeleton } from '@/components/common/states';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  SheetContent,
+} from '@/components/ui/dialog';
+import { Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { api, errorMessage, upload } from '@/lib/api';
+import type { Complaint, ComplaintCategory, Course } from '@/lib/types';
+import { timeAgo } from '@/lib/utils';
+import { CATEGORY_LABEL, ComplaintBody } from './shared';
+
+function RaiseComplaintDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <RaiseComplaintForm onDone={() => onOpenChange(false)} />
+      </DialogContent>
+    </Dialog>
+  );
 }
-function AdminActions({complaint,onUpdate}:{complaint:Complaint;onUpdate:(c:Complaint,next:string,response:string)=>Promise<void>}){const [response,setResponse]=useState(complaint.response??'');const [next,setNext]=useState(complaint.status==='open'?'in_review':'resolved');return <div className="complaint-admin-actions"><label>Response<textarea value={response} onChange={e=>setResponse(e.target.value)} rows={2} maxLength={5000} placeholder="Add a note to the reporter…"/></label><div><select value={next} onChange={e=>setNext(e.target.value)}>{(complaint.status==='open'?['in_review']:complaint.status==='in_review'?['resolved','rejected']:[]).map(s=><option key={s} value={s}>{label(s)}</option>)}</select><button className="button button-primary" disabled={!response.trim()||next===complaint.status} onClick={()=>void onUpdate(complaint,next,response)}>{complaint.status==='open'?'Start review':'Save response'}</button></div></div>}
+
+function RaiseComplaintForm({ onDone }: { onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const courses = useQuery({
+    queryKey: ['my-courses'],
+    queryFn: () => api.get<Course[]>('/me/courses'),
+  });
+  const [category, setCategory] = useState<ComplaintCategory | ''>('');
+  const [courseId, setCourseId] = useState('');
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const next: Record<string, string> = {};
+    if (!category) next.category = 'Choose a category.';
+    if (subject.trim().length < 3) next.subject = 'Subject must be at least 3 characters.';
+    if (description.trim().length < 10)
+      next.description = 'Please describe the issue (at least 10 characters).';
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    const form = new FormData();
+    form.append('category', category);
+    form.append('subject', subject.trim());
+    form.append('description', description.trim());
+    if (courseId) form.append('courseId', courseId);
+    if (file) form.append('attachment', file);
+    setSaving(true);
+    try {
+      await upload('/complaints', form);
+      toast.success('Complaint submitted. You will be notified when its status changes.');
+      void queryClient.invalidateQueries({ queryKey: ['complaints'] });
+      onDone();
+    } catch (error) {
+      setErrors({ form: errorMessage(error) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Raise a complaint</DialogTitle>
+        <DialogDescription>
+          Complaints go to the registrar. They can't be edited after filing, but you can add one
+          follow-up.
+        </DialogDescription>
+      </DialogHeader>
+      <form onSubmit={submit} className="space-y-4" noValidate>
+        {errors.form && (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/30 bg-destructive/8 p-3 text-sm text-destructive"
+          >
+            {errors.form}
+          </p>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField id="c-category" label="Category" error={errors.category} required>
+            <NativeSelect
+              id="c-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as ComplaintCategory)}
+              aria-invalid={!!errors.category}
+            >
+              <option value="" disabled>
+                Select…
+              </option>
+              {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+          <FormField id="c-course" label="Related course (optional)">
+            <NativeSelect
+              id="c-course"
+              value={courseId}
+              onChange={(e) => setCourseId(e.target.value)}
+            >
+              <option value="">None</option>
+              {(courses.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} · {c.title}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+        </div>
+        <FormField id="c-subject" label="Subject" error={errors.subject} required>
+          <Input
+            id="c-subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            maxLength={200}
+            aria-invalid={!!errors.subject}
+          />
+        </FormField>
+        <FormField id="c-description" label="Description" error={errors.description} required>
+          <Textarea
+            id="c-description"
+            rows={5}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={5000}
+            aria-invalid={!!errors.description}
+          />
+        </FormField>
+        <div className="space-y-1.5">
+          <Label>Attachment (optional)</Label>
+          <FileDropzone
+            file={file}
+            onFile={setFile}
+            accept={COMPLAINT_ACCEPT}
+            maxBytes={10 * 1024 * 1024}
+            hint="PDF, DOCX or image · max 10 MB"
+            id="c-file"
+          />
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving}>
+            Submit complaint
+          </Button>
+        </DialogFooter>
+      </form>
+    </>
+  );
+}
+
+function ComplaintSheet({
+  complaintId,
+  onClose,
+}: {
+  complaintId: string | null;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [followUp, setFollowUp] = useState('');
+  const query = useQuery({
+    queryKey: ['complaint', complaintId],
+    queryFn: () => api.get<Complaint>(`/complaints/${complaintId}`),
+    enabled: Boolean(complaintId),
+  });
+  const addFollowUp = useMutation({
+    mutationFn: () =>
+      api.post<Complaint>(`/complaints/${complaintId}/follow-up`, { comment: followUp.trim() }),
+    onSuccess: (c) => {
+      toast.success('Follow-up added');
+      setFollowUp('');
+      queryClient.setQueryData(['complaint', complaintId], c);
+      void queryClient.invalidateQueries({ queryKey: ['complaints'] });
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+
+  return (
+    <Dialog open={Boolean(complaintId)} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent aria-describedby={undefined}>
+        {query.isPending ? (
+          <ListSkeleton rows={2} />
+        ) : query.isError ? (
+          <ErrorState error={query.error} />
+        ) : (
+          <>
+            <DialogPrimitive.Title className="pr-8 text-lg font-semibold">
+              {query.data.subject}
+            </DialogPrimitive.Title>
+            <ComplaintBody complaint={query.data} />
+            {!query.data.followUp && !['resolved', 'rejected'].includes(query.data.status) && (
+              <div className="space-y-2 border-t pt-4">
+                <Label htmlFor="follow-up">Add a follow-up comment (one allowed)</Label>
+                <Textarea
+                  id="follow-up"
+                  rows={3}
+                  value={followUp}
+                  onChange={(e) => setFollowUp(e.target.value)}
+                  maxLength={2000}
+                />
+                <Button
+                  onClick={() => addFollowUp.mutate()}
+                  disabled={!followUp.trim()}
+                  loading={addFollowUp.isPending}
+                >
+                  Add follow-up
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </SheetContent>
+    </Dialog>
+  );
+}
+
+export function ComplaintsPage() {
+  const [params, setParams] = useSearchParams();
+  const [raiseOpen, setRaiseOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const openId = params.get('open');
+  const query = useQuery({
+    queryKey: ['complaints', 'mine', page],
+    queryFn: () => api.page<Complaint>('/complaints/mine', { page, pageSize: 10 }),
+    placeholderData: keepPreviousData,
+  });
+
+  return (
+    <div>
+      <PageHeader
+        title="Complaints"
+        description="Raise an academic, technical, facility or conduct issue and track its progress."
+        actions={
+          <Button onClick={() => setRaiseOpen(true)}>
+            <Plus /> Raise a complaint
+          </Button>
+        }
+      />
+      {query.isPending ? (
+        <ListSkeleton />
+      ) : query.isError ? (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      ) : query.data.data.length === 0 ? (
+        <EmptyState
+          icon={ShieldAlert}
+          title="No complaints filed"
+          description="If something isn't right, let the registrar know."
+          action={
+            <Button onClick={() => setRaiseOpen(true)}>
+              <Plus /> Raise a complaint
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <ul className="space-y-2">
+            {query.data.data.map((c) => (
+              <li key={c.id}>
+                <button
+                  onClick={() => setParams({ open: c.id })}
+                  className="flex w-full items-center gap-4 rounded-xl border bg-card p-4 text-left shadow-xs transition hover:shadow-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{c.subject}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {CATEGORY_LABEL[c.category]}
+                      {c.course ? ` · ${c.course.code}` : ''} · filed {timeAgo(c.createdAt)}
+                    </p>
+                  </div>
+                  <ComplaintStatusBadge status={c.status} />
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <Pagination
+            page={page}
+            pageSize={10}
+            total={query.data.meta.total}
+            onPageChange={setPage}
+          />
+        </>
+      )}
+      <RaiseComplaintDialog open={raiseOpen} onOpenChange={setRaiseOpen} />
+      <ComplaintSheet complaintId={openId} onClose={() => setParams({})} />
+    </div>
+  );
+}

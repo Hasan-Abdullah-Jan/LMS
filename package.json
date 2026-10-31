@@ -1,8 +1,12 @@
 {
-  "name": "internal-lms",
+  "name": "gutech-lms-portal",
   "version": "1.0.0",
   "private": true,
+  "description": "GUTECH LMS Portal - full-stack student/faculty learning management system (React + Node.js + Supabase).",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "workspaces": [
     "apps/api",
     "apps/web"
@@ -12,18 +16,35 @@
     "dev:api": "npm --workspace apps/api run dev",
     "dev:web": "npm --workspace apps/web run dev",
     "build": "npm --workspace apps/api run build && npm --workspace apps/web run build",
+    "start": "npm --workspace apps/api run start",
     "test": "npm --workspace apps/api run test && npm --workspace apps/web run test",
-    "db:reset": "supabase db reset",
+    "test:e2e": "playwright test",
+    "typecheck": "npm --workspace apps/api run typecheck && npm --workspace apps/web run typecheck",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push --include-seed",
+    "test:integration": "npm --workspace apps/api run test:integration"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.19.1",
-    "@typescript-eslint/parser": "^8.19.1",
-    "concurrently": "^9.1.2",
-    "eslint": "^9.17.0",
-    "prettier": "^3.4.2",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.63.0",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.6.2",
     "supabase": "^2.122.0",
-    "typescript": "~5.7.2"
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5"
+  },
+  "overrides": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "vite": "^8.3.5"
   }
 }

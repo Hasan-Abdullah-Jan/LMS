@@ -1,29 +1,196 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight, Bell, CheckCheck, Pin, Plus, Send, Sparkles, X } from 'lucide-react';
-import { api, ApiError } from '../../lib/api';
-import { useAuth } from '../auth/AuthProvider';
-import type { Role } from '../auth/auth.types';
-interface Announcement{id:string;courseId:string|null;authorId:string;author?:{fullName:string}|null;title:string;body:string;isPinned:boolean;createdAt:string;read:boolean;readAt:string|null}
-interface Course{id:string;code:string;title:string}
-export default function AnnouncementsPage(){
- const {profile}=useAuth();const [create,setCreate]=useState(false);const [filter,setFilter]=useState('all');const [error,setError]=useState('');const qc=useQueryClient();
- const query=useQuery({queryKey:['announcements',filter],queryFn:()=>api<{data:Announcement[];meta:{page:number;pageSize:number;total:number;unreadCount:number}}>(`/announcements?page=1&pageSize=50${filter==='all'?'':'&courseId='+filter}`)});
- const announcements=query.data?.data??[];const unread=query.data?.meta.unreadCount??0;
- const markRead=async()=>{setError('');try{await api('/announcements/read',{method:'POST',body:JSON.stringify({upTo:new Date().toISOString()})});await qc.invalidateQueries({queryKey:['announcements']})}catch{setError('Could not mark announcements as read.')}}
- const canPost=profile?.role==='admin'||profile?.role==='teacher';
- const courseList=announcements.reduce<Array<{id:string;title:string}>>((acc,a)=>a.courseId&&!acc.some(c=>c.id===a.courseId)?[...acc,{id:a.courseId,title:a.courseId}]:acc,[]);
- return <div className="announcements-page"><div className="learning-heading"><div><span className="eyebrow">NORTHSTAR UPDATES</span><h1>Announcements</h1><p>One place for the news and notes that matter to your learning.</p></div><div className="announcement-actions">{unread>0&&<button className="button button-outline" onClick={()=>void markRead()}><CheckCheck size={15}/> Mark all read</button>}{canPost&&<button className="button button-primary" onClick={()=>setCreate(true)}><Plus size={16}/> Post update</button>}</div></div>
- <div className="announcement-toolbar"><div className="announcement-filter"><Bell size={15}/><select value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Filter announcement course"><option value="all">All updates</option><option value="global">Organization-wide</option>{courseList.map(c=><option value={c.id} key={c.id}>{c.title}</option>)}</select></div><span>{unread} unread</span></div>
- {query.isLoading?<div className="table-state">Loading announcements…</div>:query.isError?<div className="table-state error-state">Could not load announcements. <button onClick={()=>void query.refetch()}>Try again</button></div>:!announcements.length?<div className="surface-card learning-empty"><Sparkles size={24}/><strong>All caught up</strong><span>There are no announcements for this view.</span></div>:<div className="announcement-feed">{announcements.filter(a=>filter!=='global'||a.courseId===null).map(a=><article key={a.id} className={`surface-card announcement-card ${a.read?'':'unread'}`}><div className="announcement-card-top"><span className={`announcement-avatar ${a.courseId?'course-announcement':''}`}>{a.courseId?'◈':<Sparkles size={17}/>}</span><div className="announcement-origin"><strong>{a.courseId?(a.author?.fullName??'Course teacher'):'Northstar team'}</strong><span>{a.courseId?'Course update':'Organization-wide'} · {new Date(a.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span></div>{!a.read&&<span className="unread-dot" title="Unread"/>}{a.isPinned&&<span className="pinned-label"><Pin size={13}/> Pinned</span>}</div><h2>{a.title}</h2><p className="announcement-body">{a.body}</p><div className="announcement-footer"><span>{a.courseId?'Course · '+a.courseId:'For everyone'}</span><button onClick={async()=>{try{await api('/announcements/read',{method:'POST',body:JSON.stringify({upTo:a.createdAt})});await qc.invalidateQueries({queryKey:['announcements']})}catch{setError('Could not mark this announcement read.')}}}>{a.read?'Read':'Mark as read'} <ArrowUpRight size={14}/></button></div></article>)}</div>}
- {error&&<div className="alert alert-error">{error}</div>}
- {create&&<AnnouncementDialog role={profile?.role??'student'} onClose={()=>setCreate(false)} onSaved={async()=>{await qc.invalidateQueries({queryKey:['announcements']});setCreate(false)}}/>}
- </div>
-}
-function AnnouncementDialog({role,onClose,onSaved}:{role:Role;onClose:()=>void;onSaved:()=>Promise<void>}){
- const [courseId,setCourseId]=useState('');const [title,setTitle]=useState('');const [body,setBody]=useState('');const [pinned,setPinned]=useState(false);const [error,setError]=useState('');const [busy,setBusy]=useState(false);
- const query=useQuery({queryKey:['myCourses'],queryFn:()=>api<{data:Course[]}>('/me/courses?page=1&pageSize=100')});const courses=query.data?.data??[];
- return <div className="modal-backdrop"><section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="announcement-dialog-title"><button className="modal-close" onClick={onClose}><X size={18}/></button><div className="modal-icon"><Bell size={19}/></div><span className="eyebrow">SHARE SOMETHING IMPORTANT</span><h2 id="announcement-dialog-title">Post an announcement</h2><form onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{await api('/announcements',{method:'POST',body:JSON.stringify({courseId:role==='admin'?(courseId||null):courseId,title,body,isPinned:pinned})});await onSaved()}catch(e){setError(e instanceof ApiError?e.message:'Could not post announcement.')}finally{setBusy(false)}}}>{role==='teacher'&&<><label>Course</label><select value={courseId} onChange={e=>setCourseId(e.target.value)} required><option value="">Choose a class…</option>{courses.map(c=><option value={c.id} key={c.id}>{c.code} · {c.title}</option>)}</select></>}{role==='admin'&&<><label>Audience</label><select value={courseId} onChange={e=>setCourseId(e.target.value)}><option value="">Everyone</option>{courses.map(c=><option value={c.id} key={c.id}>{c.code} · {c.title}</option>)}</select></>}<label>Headline</label><input value={title} onChange={e=>setTitle(e.target.value)} maxLength={180} required placeholder="A clear, helpful title"/><label>Message</label><textarea value={body} onChange={e=>setBody(e.target.value)} rows={6} maxLength={10000} required placeholder="Write your update…"/><label className="checkbox-line"><input type="checkbox" checked={pinned} onChange={e=>setPinned(e.target.checked)}/> Pin this announcement</label>{error&&<div className="alert alert-error">{error}</div>}<div className="dialog-actions"><button type="button" className="button button-outline" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy||query.isLoading}>{busy?'Posting…':<>Publish <Send size={14}/></>}</button></div></form></section></div>
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCheck, Megaphone, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/common/misc';
+import { PageHeader, Pagination } from '@/components/common/page';
+import { EmptyState, ErrorState, ListSkeleton } from '@/components/common/states';
+import { Button } from '@/components/ui/button';
+import { NativeSelect } from '@/components/ui/input';
+import { useUser } from '@/features/auth/AuthProvider';
+import { api, errorMessage } from '@/lib/api';
+import { isStaff } from '@/lib/roles';
+import type { Announcement, Course } from '@/lib/types';
+import { AnnouncementCard } from './AnnouncementCard';
+import { AnnouncementDialog } from './AnnouncementDialog';
+
+const PAGE_SIZE = 10;
+
+export function AnnouncementFeed({
+  courseId: fixedCourseId,
+  canPost,
+}: {
+  courseId?: string;
+  canPost: boolean;
+}) {
+  const user = useUser();
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState(fixedCourseId ?? '');
+  const [page, setPage] = useState(1);
+  const [dialog, setDialog] = useState<{ open: boolean; editing?: Announcement }>({ open: false });
+  const [toDelete, setToDelete] = useState<Announcement | null>(null);
+
+  const courses = useQuery({
+    queryKey: ['my-courses'],
+    queryFn: () => api.get<Course[]>('/me/courses'),
+    enabled: !fixedCourseId,
+  });
+  const feed = useQuery({
+    queryKey: ['announcements', 'feed', filter, page],
+    queryFn: () =>
+      api.page<Announcement>('/announcements', {
+        courseId: filter || undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+  const markRead = useMutation({
+    mutationFn: () => api.post('/announcements/read', {}),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['announcements'] }),
+  });
+  // Opening the feed marks what you've seen as read (up to now).
+  const hasUnread = feed.data?.data.some((a) => !a.isRead);
+  useEffect(() => {
+    if (!hasUnread) return;
+    const t = setTimeout(() => markRead.mutate(), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasUnread]);
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.delete(`/announcements/${id}`),
+    onSuccess: () => {
+      toast.success('Announcement deleted');
+      void queryClient.invalidateQueries({ queryKey: ['announcements'] });
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {!fixedCourseId ? (
+          <NativeSelect
+            aria-label="Filter by course"
+            className="sm:w-72"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All announcements</option>
+            <option value="global">Campus-wide only</option>
+            {(courses.data ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.code} · {c.title}
+              </option>
+            ))}
+          </NativeSelect>
+        ) : (
+          <span />
+        )}
+        <div className="flex gap-2">
+          {hasUnread && (
+            <Button
+              variant="outline"
+              onClick={() => markRead.mutate()}
+              loading={markRead.isPending}
+            >
+              <CheckCheck /> Mark all read
+            </Button>
+          )}
+          {canPost && (
+            <Button onClick={() => setDialog({ open: true })}>
+              <Plus /> New announcement
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {feed.isPending ? (
+        <ListSkeleton />
+      ) : feed.isError ? (
+        <ErrorState error={feed.error} onRetry={() => void feed.refetch()} />
+      ) : feed.data.data.length === 0 ? (
+        <EmptyState
+          icon={Megaphone}
+          title="No announcements"
+          description="Announcements from your teachers and the registrar appear here."
+        />
+      ) : (
+        <>
+          <div className="space-y-3">
+            {feed.data.data.map((a) => (
+              <AnnouncementCard
+                key={a.id}
+                announcement={a}
+                actions={
+                  (user.role === 'admin' || a.authorId === user.id) && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Edit announcement"
+                        onClick={() => setDialog({ open: true, editing: a })}
+                      >
+                        <Pencil />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Delete announcement"
+                        onClick={() => setToDelete(a)}
+                      >
+                        <Trash2 className="text-destructive" />
+                      </Button>
+                    </>
+                  )
+                }
+              />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={feed.data.meta.total}
+            onPageChange={setPage}
+          />
+        </>
+      )}
+
+      {canPost && (
+        <AnnouncementDialog
+          open={dialog.open}
+          editing={dialog.editing}
+          fixedCourseId={fixedCourseId}
+          onOpenChange={(open) => setDialog((d) => ({ ...d, open }))}
+        />
+      )}
+      <ConfirmDialog
+        open={!!toDelete}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title="Delete announcement?"
+        description={`"${toDelete?.title}" will be removed for everyone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => toDelete && remove.mutate(toDelete.id)}
+      />
+    </div>
+  );
 }
 
-
+export function AnnouncementsPage() {
+  const user = useUser();
+  return (
+    <div>
+      <PageHeader
+        title="Announcements"
+        description="Pinned items always appear first. New posts arrive in real time."
+      />
+      <AnnouncementFeed canPost={isStaff(user.role)} />
+    </div>
+  );
+}

@@ -1,0 +1,44 @@
+# Render Blueprint - one Node web service that serves both the Express API
+# (/api) and the built React app (everything else). Same origin => the
+# refresh-token cookie is first-party and no CORS is needed.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: gutech-lms
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_WEB
+        value: 'true'
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: TRUST_PROXY
+        value: '1'
+      # Your public URL, e.g. https://gutech-lms.onrender.com
+      - key: CLIENT_ORIGIN
+        sync: false
+      # <your public URL>/reset-password (also add it to Supabase Auth -> URL Configuration)
+      - key: PASSWORD_RESET_REDIRECT
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Build-time settings for the React app (Vite inlines VITE_* at build).
+      - key: VITE_API_URL
+        value: /api
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false

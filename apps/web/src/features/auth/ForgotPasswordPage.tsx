@@ -1,25 +1,94 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Mail, Sparkles } from 'lucide-react';
-import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { MailCheck } from 'lucide-react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { Link } from 'react-router-dom';
 import { z } from 'zod';
-import { api } from '../../lib/api';
+import { FormField } from '@/components/common/misc';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { errorMessage, getData } from '@/lib/api';
+import { AuthLayout } from './AuthLayout';
 
-const schema = z.object({ email: z.string().email('Enter a valid email address') });
-export default function ForgotPasswordPage() {
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<{email:string}>({resolver:zodResolver(schema)});
-  const submit = handleSubmit(async (values) => {
-    setError('');
-    try { await api('/auth/forgot-password', {method:'POST',body:JSON.stringify(values)}); setSent(true); }
-    catch { setError('Unable to request a reset right now. Please try again shortly.'); }
+const schema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Enter your email.')
+    .pipe(z.email('Enter a valid email address.')),
+});
+
+export function ForgotPasswordPage() {
+  const [sentMessage, setSentMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { register, handleSubmit, formState } = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
   });
-  return <main className="simple-auth"><div className="brand"><span className="brand-mark"><Sparkles size={18}/></span><span>northstar learning</span></div><section className="simple-card">
-    <div className="welcome-icon"><Mail size={20}/></div><span className="eyebrow">ACCOUNT RECOVERY</span><h1>{sent?'Check your inbox':'Forgot your password?'}</h1>
-    {sent?<><p className="auth-subtitle">If an account exists for that email, a reset link has been sent.</p><div className="alert alert-success">The link is valid for one hour. Check your spam folder if it doesn’t arrive.</div></>:<><p className="auth-subtitle">Enter your work email and we’ll send you a link to reset your password.</p><form onSubmit={submit}><label htmlFor="email">Email address</label><input id="email" type="email" autoComplete="email" placeholder="you@company.com" {...register('email')}/>{errors.email&&<span className="field-error">{errors.email.message}</span>}{error&&<div className="alert alert-error">{error}</div>}<button className="button button-primary button-wide" disabled={isSubmitting}>{isSubmitting?'Sending…':'Send reset link'}</button></form></>}
-    <Link className="back-link" to="/login"><ArrowLeft size={16}/> Back to sign in</Link>
-  </section></main>;
-}
 
+  const onSubmit = handleSubmit(async ({ email }) => {
+    setError(null);
+    try {
+      const result = await getData<{ message: string }>('/auth/forgot-password', {
+        method: 'POST',
+        body: { email },
+        skipRefresh: true,
+      });
+      setSentMessage(result.message);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  });
+
+  if (sentMessage) {
+    return (
+      <AuthLayout title="Check your inbox">
+        <div className="space-y-4 rounded-xl border bg-card p-5 text-sm" role="status">
+          <MailCheck className="size-8 text-success" aria-hidden />
+          <p>{sentMessage}</p>
+          <p className="text-muted-foreground">
+            Didn&apos;t get it? Check your spam folder or try again in a few minutes.
+          </p>
+        </div>
+        <Button asChild variant="outline" className="w-full">
+          <Link to="/login">Back to sign in</Link>
+        </Button>
+      </AuthLayout>
+    );
+  }
+
+  return (
+    <AuthLayout
+      title="Reset your password"
+      description="Enter your account email and we'll send you a secure reset link."
+    >
+      <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/30 bg-destructive/8 p-3 text-sm text-destructive"
+          >
+            {error}
+          </p>
+        )}
+        <FormField id="email" label="Email" error={formState.errors.email?.message}>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            autoFocus
+            {...register('email')}
+            aria-invalid={!!formState.errors.email}
+          />
+        </FormField>
+        <Button type="submit" className="w-full" size="lg" loading={formState.isSubmitting}>
+          Send reset link
+        </Button>
+        <p className="text-center text-sm">
+          <Link to="/login" className="font-medium text-primary hover:underline">
+            Back to sign in
+          </Link>
+        </p>
+      </form>
+    </AuthLayout>
+  );
+}

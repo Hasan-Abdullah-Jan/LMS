@@ -1,11 +1,17 @@
-import type { UserRole } from '../modules/auth/auth.types.js';
+import type { Db } from '../config/supabase.js';
+import type { AuthUser } from './auth.js';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: { id: string; role: UserRole; accessToken: string; email: string; fullName: string; mustChangePassword: boolean; createdAt: string };
+      /** Set by requireAuth. */
+      user?: AuthUser;
+      /** Supabase client bound to the caller's JWT (RLS enforced). */
+      db?: Db;
+      /** The verified bearer token. */
+      accessToken?: string;
     }
   }
 }
-export {};
 
+export {};

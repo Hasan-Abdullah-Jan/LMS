@@ -1,34 +1,500 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, CirclePlus, Download, MoreHorizontal, Search, SlidersHorizontal, Users, X } from 'lucide-react';
-import { api, ApiError } from '../../lib/api';
-import type { Profile, Role } from '../auth/auth.types';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { KeyRound, MoreHorizontal, Pencil, Plus, Users } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { toast } from 'sonner';
+import { RoleBadge } from '@/components/common/badges';
+import { FormField, SearchInput } from '@/components/common/misc';
+import { PageHeader, Pagination } from '@/components/common/page';
+import { EmptyState, ErrorState, ListSkeleton } from '@/components/common/states';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input, NativeSelect } from '@/components/ui/input';
+import { Switch, UserAvatar } from '@/components/ui/misc';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useUser } from '@/features/auth/AuthProvider';
+import { PasswordInput, passwordPolicy } from '@/features/auth/password';
+import { ApiError, api, errorMessage } from '@/lib/api';
+import type { Profile, Role } from '@/lib/types';
+import { formatDate } from '@/lib/utils';
 
-type UserResult={data:Profile[];meta:{page:number;pageSize:number;total:number}};
-const roles:Role[]=['admin','teacher','student'];
-export default function UsersPage(){
-  const [search,setSearch]=useState('');const [role,setRole]=useState('all');const [page,setPage]=useState(1);const [createOpen,setCreateOpen]=useState(false);const [notice,setNotice]=useState('');
-  const qc=useQueryClient();
-  const query=useQuery({queryKey:['users',search,role,page],queryFn:()=>api<UserResult>(`/auth/admin/users?page=${page}&pageSize=10${search?'&search='+encodeURIComponent(search):''}${role==='all'?'':'&role='+role}`)});
-  const users=query.data?.data??[];const total=query.data?.meta.total??0;
-  return <div className="users-page"><div className="page-title-row"><div><span className="eyebrow">PEOPLE & ACCESS</span><h1>Team members</h1><p>Manage the people learning and teaching at Northstar.</p></div><button className="button button-primary" onClick={()=>setCreateOpen(true)}><CirclePlus size={17}/> Add a member</button></div>
-    <div className="user-stat-row"><div className="user-stat"><span className="user-stat-icon lavender"><Users size={17}/></span><div><strong>{total.toLocaleString()}</strong><span>Total members</span></div><span className="tiny-change">All roles</span></div><div className="user-stat"><span className="user-stat-icon green"><span className="active-dot"/></span><div><strong>{query.isLoading?'—':users.filter(u=>u.isActive).length}</strong><span>Active on this page</span></div><span className="tiny-change">Current view</span></div><div className="user-stat"><span className="user-stat-icon peach"><span className="pending-dot"/></span><div><strong>{query.isLoading?'—':users.filter(u=>u.mustChangePassword).length}</strong><span>Need password setup</span></div><span className="tiny-change">Current view</span></div></div>
-    <section className="surface-card members-card"><div className="members-header"><div><h2>All members <span className="count-pill">{total}</span></h2><p>Manage roles, access, and account status.</p></div><button className="button button-outline" onClick={()=>setNotice('CSV export is available when connected to your workspace data.')}><Download size={16}/> Export</button></div>
-      {notice&&<div className="alert alert-success dismissible">{notice}<button onClick={()=>setNotice('')} aria-label="Dismiss"><X size={14}/></button></div>}
-      <div className="table-toolbar"><div className="search-box"><Search size={16}/><input value={search} onChange={e=>{setPage(1);setSearch(e.target.value)}} placeholder="Search by name or email…" aria-label="Search members"/></div><label className="filter-select"><SlidersHorizontal size={15}/><select value={role} onChange={e=>{setPage(1);setRole(e.target.value)}} aria-label="Filter role"><option value="all">All roles</option>{roles.map(r=><option key={r} value={r}>{r[0].toUpperCase()+r.slice(1)}</option>)}</select><ChevronDown size={14}/></label></div>
-      {query.isLoading?<div className="table-state" role="status">Loading members…</div>:query.isError?<div className="table-state error-state">We couldn’t load members. <button onClick={()=>void query.refetch()}>Try again</button></div>:users.length===0?<div className="table-state"><span className="empty-illustration"><Users size={22}/></span><strong>No members found</strong><span>Try adjusting the search or role filter.</span></div>:<div className="table-scroll"><table><thead><tr><th>Member <ArrowUpRight size={12}/></th><th>Role <ArrowDown size={12}/></th><th>Status</th><th>Joined</th><th aria-label="Actions"/></tr></thead><tbody>{users.map((u,i)=><MemberRow key={u.id} user={u} index={i} onUpdate={async patch=>{try{await api(`/auth/admin/users/${u.id}`,{method:'PATCH',body:JSON.stringify(patch)});await qc.invalidateQueries({queryKey:['users']})}catch(e){setNotice(e instanceof ApiError?e.message:'Could not update member')}}} onReset={async()=>{try{await api(`/auth/admin/users/${u.id}/reset-password`,{method:'POST'});setNotice('Password reset email sent to '+u.email)}catch{setNotice('Could not send a password reset email.')}}}/>)}</tbody></table></div>}
-      <div className="table-bottom"><span>Showing <strong>{total===0?0:(page-1)*10+1}–{Math.min(page*10,total)}</strong> of <strong>{total.toLocaleString()}</strong> members</span><div className="pagination"><button aria-label="Previous page" disabled={page<=1} onClick={()=>setPage(page-1)}><ChevronLeft size={16}/></button><span>Page {page} of {Math.max(1,Math.ceil(total/10))}</span><button aria-label="Next page" disabled={page*10>=total} onClick={()=>setPage(page+1)}><ChevronRight size={16}/></button></div></div>
-    </section><div className="users-help"><span className="help-spark">✳</span><div><strong>A thoughtful team starts with a thoughtful welcome.</strong><span>New members will be asked to update their temporary password at first sign in.</span></div><button onClick={()=>setCreateOpen(true)}>Add someone new <ArrowUpRight size={15}/></button></div>
-    {createOpen&&<CreateUserDialog onClose={()=>setCreateOpen(false)} onCreate={async data=>{await api('/auth/admin/users',{method:'POST',body:JSON.stringify(data)});await qc.invalidateQueries({queryKey:['users']});setCreateOpen(false);setNotice('Member account created. Share the temporary password securely.')}}/>}
-  </div>;
-}
-function MemberRow({user,index,onUpdate,onReset}:{user:Profile;index:number;onUpdate:(v:unknown)=>Promise<void>;onReset:()=>Promise<void>}){
-  const [open,setOpen]=useState(false);const names=['lavender','peach','mint','blue','pink'];const initials=user.fullName.split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase();
-  return <tr><td><div className="member-cell"><span className={`member-avatar ${names[index%names.length]}`}>{initials}</span><span><strong>{user.fullName}</strong><small>{user.email}</small></span></div></td><td><span className={`role-pill role-${user.role}`}><i/>{user.role}</span></td><td><button className={`status-pill ${user.isActive?'status-active':'status-inactive'}`} onClick={()=>void onUpdate({isActive:!user.isActive})}><i/>{user.isActive?'Active':'Inactive'}</button>{user.mustChangePassword&&<small className="password-pending">Password setup pending</small>}</td><td className="joined-cell">{new Date(user.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td><td className="actions-cell"><button className="table-more" aria-label={`More actions for ${user.fullName}`} onClick={()=>setOpen(!open)}><MoreHorizontal size={19}/></button>{open&&<div className="row-menu"><button onClick={()=>{setOpen(false);void onUpdate({isActive:!user.isActive})}}>{user.isActive?'Deactivate':'Reactivate'}</button><button onClick={()=>{setOpen(false);void onReset()}}>Send password reset</button></div>}</td></tr>
-}
-function CreateUserDialog({onClose,onCreate}:{onClose:()=>void;onCreate:(v:{fullName:string;email:string;role:Role;temporaryPassword:string;rollNo?:string})=>Promise<void>}){
-  const [fullName,setName]=useState('');const [email,setEmail]=useState('');const [role,setRole]=useState<Role>('student');const [password,setPassword]=useState('');const [rollNo,setRoll]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false);
-  const submit=async(e:React.FormEvent)=>{e.preventDefault();setError('');if(fullName.trim().length<1||!email.includes('@')||password.length<10||!/[A-Za-z]/.test(password)||!/[0-9]/.test(password)){setError('Enter a name, valid email, and a temporary password with 10+ characters, a letter, and a number.');return}if(role==='student'&&!rollNo.trim()){setError('Student roll number is required.');return}setBusy(true);try{await onCreate({fullName,email,role,temporaryPassword:password,...(role==='student'?{rollNo}: {})})}catch(e){setError(e instanceof ApiError?e.message:'Unable to create this account.')}finally{setBusy(false)}};
-  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-title"><button className="modal-close" onClick={onClose} aria-label="Close"><X size={18}/></button><div className="modal-icon"><CirclePlus size={20}/></div><span className="eyebrow">A NEW NORTHSTAR</span><h2 id="create-title">Add a team member</h2><p>Create an account and share the temporary password with them securely.</p><form onSubmit={submit}><label htmlFor="fullName">Full name</label><input autoFocus id="fullName" value={fullName} onChange={e=>setName(e.target.value)} placeholder="e.g. Jordan Lee"/><label htmlFor="member-email">Work email</label><input id="member-email" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="jordan@company.com"/><label htmlFor="member-role">Role</label><select id="member-role" value={role} onChange={e=>setRole(e.target.value as Role)}>{roles.map(r=><option key={r} value={r}>{r[0].toUpperCase()+r.slice(1)}</option>)}</select>{role==='student'&&<><label htmlFor="rollNo">Student roll number</label><input id="rollNo" value={rollNo} onChange={e=>setRoll(e.target.value)} placeholder="e.g. NS-2601"/></>}<label htmlFor="tempPass">Temporary password</label><input id="tempPass" type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 10 characters"/>{error&&<div className="alert alert-error">{error}</div>}<div className="dialog-actions"><button type="button" className="button button-outline" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy}>{busy?'Creating…':'Create account'}</button></div></form></section></div>
+const PAGE_SIZE = 15;
+
+function generatePassword(): string {
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const pick = (set: string) => set[crypto.getRandomValues(new Uint32Array(1))[0]! % set.length]!;
+  return `${Array.from({ length: 8 }, () => pick(letters)).join('')}${pick(digits)}${pick(digits)}!`;
 }
 
+function UserDialog({
+  open,
+  onOpenChange,
+  editing,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  editing?: Profile;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <UserForm editing={editing} onDone={() => onOpenChange(false)} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Mounted fresh each time the dialog opens, so its state always starts from props. */
+function UserForm({ editing, onDone }: { editing?: Profile; onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [fullName, setFullName] = useState(editing?.fullName ?? '');
+  const [email, setEmail] = useState(editing?.email ?? '');
+  const [role, setRole] = useState<Role>(editing?.role ?? 'student');
+  const [rollNo, setRollNo] = useState(editing?.rollNo ?? '');
+  const [password, setPassword] = useState(() => (editing ? '' : generatePassword()));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const next: Record<string, string> = {};
+    if (fullName.trim().length < 2) next.fullName = 'Enter the full name.';
+    if (!editing && !/^\S+@\S+\.\S+$/.test(email.trim())) next.email = 'Enter a valid email.';
+    if (!editing) {
+      const check = passwordPolicy.safeParse(password);
+      if (!check.success) next.temporaryPassword = check.error.issues[0]!.message;
+    }
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    setSaving(true);
+    try {
+      if (editing) {
+        await api.patch(`/admin/users/${editing.id}`, {
+          fullName: fullName.trim(),
+          role,
+          rollNo: role === 'student' ? rollNo.trim() || null : null,
+        });
+        toast.success('User updated');
+      } else {
+        await api.post('/admin/users', {
+          fullName: fullName.trim(),
+          email: email.trim(),
+          role,
+          rollNo: role === 'student' ? rollNo.trim() || undefined : undefined,
+          temporaryPassword: password,
+        });
+        toast.success('Account created', {
+          description: `Share the temporary password securely. ${fullName.split(' ')[0]} must change it at first sign-in.`,
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      onDone();
+    } catch (error) {
+      if (error instanceof ApiError && error.details.length) {
+        setErrors(Object.fromEntries(error.details.map((d) => [d.path ?? 'form', d.message])));
+      } else setErrors({ form: errorMessage(error) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{editing ? 'Edit user' : 'Create user'}</DialogTitle>
+        <DialogDescription>
+          {editing
+            ? editing.email
+            : 'Accounts are created by the registrar only. The user must change the temporary password at first sign-in.'}
+        </DialogDescription>
+      </DialogHeader>
+      <form onSubmit={submit} className="space-y-4" noValidate>
+        {errors.form && (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/30 bg-destructive/8 p-3 text-sm text-destructive"
+          >
+            {errors.form}
+          </p>
+        )}
+        <FormField id="u-name" label="Full name" error={errors.fullName} required>
+          <Input
+            id="u-name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            maxLength={120}
+          />
+        </FormField>
+        {!editing && (
+          <FormField id="u-email" label="Email" error={errors.email} required>
+            <Input
+              id="u-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </FormField>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField id="u-role" label="Role" error={errors.role} required>
+            <NativeSelect
+              id="u-role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as Role)}
+            >
+              <option value="student">Student</option>
+              <option value="teacher">Teacher</option>
+              <option value="admin">Administrator</option>
+            </NativeSelect>
+          </FormField>
+          {role === 'student' && (
+            <FormField id="u-roll" label="Roll number" error={errors.rollNo}>
+              <Input
+                id="u-roll"
+                value={rollNo}
+                onChange={(e) => setRollNo(e.target.value)}
+                maxLength={32}
+                placeholder="GU-24-010"
+              />
+            </FormField>
+          )}
+        </div>
+        {!editing && (
+          <FormField
+            id="u-pass"
+            label="Temporary password"
+            error={errors.temporaryPassword}
+            hint="At least 10 characters with a letter and a number."
+            required
+          >
+            <div className="flex gap-2">
+              <PasswordInput
+                id="u-pass"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPassword(generatePassword())}
+              >
+                Generate
+              </Button>
+            </div>
+          </FormField>
+        )}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={saving}>
+            {editing ? 'Save' : 'Create account'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </>
+  );
+}
+
+function ResetPasswordDialog({ user, onClose }: { user: Profile | null; onClose: () => void }) {
+  return (
+    <Dialog open={Boolean(user)} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>{user && <ResetPasswordForm user={user} onClose={onClose} />}</DialogContent>
+    </Dialog>
+  );
+}
+
+function ResetPasswordForm({ user, onClose }: { user: Profile; onClose: () => void }) {
+  const [mode, setMode] = useState<'email' | 'temporary'>('email');
+  const [password, setPassword] = useState(generatePassword);
+  const [error, setError] = useState<string | null>(null);
+  const reset = useMutation({
+    mutationFn: () =>
+      api.post<{ message: string }>(
+        `/admin/users/${user.id}/reset-password`,
+        mode === 'email' ? { mode } : { mode, temporaryPassword: password },
+      ),
+    onSuccess: (r) => {
+      toast.success(r.message);
+      onClose();
+    },
+    onError: (e) => setError(errorMessage(e)),
+  });
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Reset password</DialogTitle>
+        <DialogDescription>
+          {user.fullName} · {user.email}
+        </DialogDescription>
+      </DialogHeader>
+      {error && (
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/8 p-3 text-sm text-destructive"
+        >
+          {error}
+        </p>
+      )}
+      <fieldset className="space-y-2">
+        <legend className="sr-only">Reset method</legend>
+        <label className="flex cursor-pointer gap-3 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+          <input
+            type="radio"
+            name="mode"
+            checked={mode === 'email'}
+            onChange={() => setMode('email')}
+            className="mt-1 accent-[var(--primary)]"
+          />
+          <span>
+            <span className="text-sm font-medium">Email a reset link</span>
+            <span className="block text-xs text-muted-foreground">
+              Single-use link, valid for 1 hour.
+            </span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer gap-3 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+          <input
+            type="radio"
+            name="mode"
+            checked={mode === 'temporary'}
+            onChange={() => setMode('temporary')}
+            className="mt-1 accent-[var(--primary)]"
+          />
+          <span>
+            <span className="text-sm font-medium">Set a temporary password</span>
+            <span className="block text-xs text-muted-foreground">
+              Signs the user out everywhere; they must change it at next sign-in.
+            </span>
+          </span>
+        </label>
+      </fieldset>
+      {mode === 'temporary' && (
+        <div className="flex gap-2">
+          <PasswordInput
+            aria-label="Temporary password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Button type="button" variant="outline" onClick={() => setPassword(generatePassword())}>
+            Generate
+          </Button>
+        </div>
+      )}
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={() => reset.mutate()} loading={reset.isPending}>
+          {mode === 'email' ? 'Send link' : 'Set password'}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+export function UsersPage() {
+  const me = useUser();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [role, setRole] = useState('');
+  const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [dialog, setDialog] = useState<{ open: boolean; editing?: Profile }>({ open: false });
+  const [resetting, setResetting] = useState<Profile | null>(null);
+
+  const query = useQuery({
+    queryKey: ['admin-users', search, role, status, page],
+    queryFn: () =>
+      api.page<Profile>('/admin/users', { search, role, status, page, pageSize: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: (u: Profile) =>
+      api.patch<Profile>(`/admin/users/${u.id}`, { isActive: !u.isActive }),
+    onSuccess: (u) => {
+      toast.success(
+        u.isActive ? `${u.fullName} reactivated` : `${u.fullName} deactivated and signed out`,
+      );
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+
+  return (
+    <div>
+      <PageHeader
+        title="Users"
+        description="Create accounts, change roles, deactivate access and reset passwords."
+        actions={
+          <Button onClick={() => setDialog({ open: true })}>
+            <Plus /> Create user
+          </Button>
+        }
+      />
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+        <SearchInput
+          value={search}
+          onChange={(v) => {
+            setSearch(v);
+            setPage(1);
+          }}
+          placeholder="Name, email or roll no…"
+          label="Search users"
+        />
+        <NativeSelect
+          aria-label="Filter by role"
+          className="sm:w-40"
+          value={role}
+          onChange={(e) => {
+            setRole(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">All roles</option>
+          <option value="student">Students</option>
+          <option value="teacher">Teachers</option>
+          <option value="admin">Admins</option>
+        </NativeSelect>
+        <NativeSelect
+          aria-label="Filter by status"
+          className="sm:w-40"
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">Any status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Deactivated</option>
+        </NativeSelect>
+      </div>
+      {query.isPending ? (
+        <ListSkeleton />
+      ) : query.isError ? (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      ) : query.data.data.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="No users found"
+          description="Try a different search or filter."
+        />
+      ) : (
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Roll no.</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Active</TableHead>
+                <TableHead className="sr-only">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {query.data.data.map((u) => (
+                <TableRow key={u.id} className={u.isActive ? undefined : 'opacity-70'}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar name={u.fullName} className="size-8" />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">
+                          {u.fullName}{' '}
+                          {u.id === me.id && (
+                            <span className="text-xs text-muted-foreground">(you)</span>
+                          )}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                      </div>
+                      {u.mustChangePassword && (
+                        <Badge variant="warning" className="hidden md:inline-flex">
+                          Temp password
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <RoleBadge role={u.role} />
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{u.rollNo ?? '—'}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(u.createdAt)}
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={u.isActive}
+                      disabled={
+                        u.id === me.id ||
+                        (toggleActive.isPending && toggleActive.variables?.id === u.id)
+                      }
+                      onCheckedChange={() => toggleActive.mutate(u)}
+                      aria-label={`${u.isActive ? 'Deactivate' : 'Activate'} ${u.fullName}`}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Actions for ${u.fullName}`}
+                        >
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onSelect={() => setDialog({ open: true, editing: u })}>
+                          <Pencil /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setResetting(u)}>
+                          <KeyRound /> Reset password
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={query.data.meta.total}
+            onPageChange={setPage}
+          />
+        </>
+      )}
+      <UserDialog
+        open={dialog.open}
+        editing={dialog.editing}
+        onOpenChange={(open) => setDialog((d) => ({ ...d, open }))}
+      />
+      <ResetPasswordDialog user={resetting} onClose={() => setResetting(null)} />
+    </div>
+  );
+}

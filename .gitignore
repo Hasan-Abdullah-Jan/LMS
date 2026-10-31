@@ -1,7 +1,23 @@
+# dependencies
 node_modules/
+
+# builds
 dist/
+*.tsbuildinfo
 coverage/
+
+# env
 .env
 .env.*
 !.env.example
+
+# tooling
 .DS_Store
+.vercel
+.idea
+.vscode/*
+!.vscode/extensions.json
+playwright-report/
+test-results/
+supabase/.temp/
+supabase/.branches/
