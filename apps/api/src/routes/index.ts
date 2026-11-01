@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { checkReadiness } from '../services/health.service.js';
 import { requireAuth, requirePasswordChanged } from '../middleware/auth.js';
 import { adminRoutes } from './admin.routes.js';
 import { appRoutes } from './app.routes.js';
@@ -21,6 +22,9 @@ const PROTECTED_PREFIXES = [
 export const apiRouter = Router()
   .get('/health', (_req, res) => {
     res.json({ data: { status: 'ok', service: 'gutech-lms-api', time: new Date().toISOString() } });
+  })
+  .get('/health/ready', async (_req, res) => {
+    res.json({ data: await checkReadiness() });
   })
   .use('/auth', authRoutes)
   .use('/admin', requireAuth, requirePasswordChanged, adminRoutes)

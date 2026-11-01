@@ -31,8 +31,11 @@ URL variables to maintain**.
    The build reuses the URL and anon key for the browser (they are public values). The service-role
    key stays on the server and is never part of the web bundle.
 
-3. **Deploy.** Open `https://<your-project>.vercel.app/api/health`, then sign in as
-   `admin@gutech.demo` / `Gutech@2026`.
+3. **Deploy.** Open `https://<your-project>.vercel.app/api/health/ready`. It must show
+   `serviceKey: ok`, `anonKey: ok`, `profiles` greater than 0 and `hint: All good.` — if not, the
+   `hint` says which variable or setup step is wrong (**environment variables only apply to a new
+   deployment, so redeploy after changing them**). Then sign in as `admin@gutech.demo` /
+   `Gutech@2026`.
 
 ### Known limits on Vercel
 

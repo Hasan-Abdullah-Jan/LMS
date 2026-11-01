@@ -12,6 +12,21 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 const unique = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
+describe('Deployment self-check', () => {
+  it('/api/health/ready reports working keys and a populated database without leaking secrets', async () => {
+    const res = await api().get('/api/health/ready');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({
+      api: 'ok',
+      serviceKey: 'ok',
+      anonKey: 'ok',
+      hint: 'All good.',
+    });
+    expect(res.body.data.profiles).toBeGreaterThan(0);
+    expect(JSON.stringify(res.body)).not.toContain(serviceKey);
+  });
+});
+
 describe('Feature 1 - Login (no sign-up)', () => {
   it('valid login returns tokens and the profile with role; refresh token is an httpOnly cookie', async () => {
     const res = await api()
