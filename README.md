@@ -11,7 +11,7 @@ Row Level Security.
 
 |                       |                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------- |
-| **Live demo**         | `https://<your-app>.onrender.com` _(see [Deployment](#deployment))_                      |
+| **Live demo**         | `https://<your-project>.vercel.app` _(see [Deployment](#deployment))_                    |
 | **Video walkthrough** | `<YouTube / Loom / Drive link>` _(script: [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md))_ |
 | **Demo password**     | `Gutech@2026` for every seeded account                                                   |
 
@@ -214,18 +214,15 @@ push ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ## Deployment
 
-**Recommended: one Render web service** (API + SPA on the same origin, so the refresh cookie is
-first-party and uploads are not limited by a proxy).
+**Vercel — one project, one URL** (website + API function; no URL variables to maintain):
 
-1. Create a Supabase project. In **Authentication → Sign In / Providers** keep _Email_ enabled and
-   turn **off** _Allow new users to sign up_. Under **URL Configuration** set the Site URL to your
-   app URL and add `https://<your-app>/reset-password` to Redirect URLs.
-2. Push the schema and demo data: `npx supabase link --project-ref <ref>` then `npm run db:push`.
-3. In Render choose **New → Blueprint**, select this repo (it reads [`render.yaml`](render.yaml)),
-   and fill in the Supabase URL/keys plus `CLIENT_ORIGIN` / `PASSWORD_RESET_REDIRECT`.
-4. Deploy, then open the URL and sign in with a demo account.
+1. In Supabase **SQL Editor**, paste and run [`supabase/setup.sql`](supabase/setup.sql) (schema + demo
+   data). Under **Authentication → Sign In / Providers** turn **off** _Allow new users to sign up_.
+2. In Vercel, **Add New → Project**, import this repo (keep the root directory) and set three
+   environment variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+3. Deploy, then sign in with a demo account.
 
-Vercel (web) + Render (API), and full screenshots-free step-by-step instructions:
+Details, limits (4.5 MB upload cap on Vercel) and the Render alternative:
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Project structure
