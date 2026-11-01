@@ -11,6 +11,10 @@ URL variables to maintain**.
 
 1. Open **SQL Editor → New query**, paste the whole file [`supabase/setup.sql`](../supabase/setup.sql)
    (all migrations + demo data) and press **Run**. Run it once, on an empty project.
+   - **If you get `ERROR: 42710: type "user_role" already exists`**, the setup already ran once (or
+     partly). Paste and run [`supabase/reset-hosted.sql`](../supabase/reset-hosted.sql) first. It
+     deletes all app data and the `@gutech.demo` accounts in this project, then run `setup.sql`
+     again. Do not run the reset on a project with real data.
 2. **Authentication → Sign In / Providers**: keep **Email** on and turn **off** _Allow new users to
    sign up_. (Without this anyone could create an account straight against Supabase.)
 3. **Project Settings → API**: copy the **Project URL**, the **anon / publishable key** and the

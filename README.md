@@ -217,7 +217,7 @@ push ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 **Vercel — one project, one URL** (website + API function; no URL variables to maintain):
 
 1. In Supabase **SQL Editor**, paste and run [`supabase/setup.sql`](supabase/setup.sql) (schema + demo
-   data). Under **Authentication → Sign In / Providers** turn **off** _Allow new users to sign up_.
+   data). If it reports `type "user_role" already exists`, run [`supabase/reset-hosted.sql`](supabase/reset-hosted.sql) first, then `setup.sql` again. Under **Authentication → Sign In / Providers** turn **off** _Allow new users to sign up_.
 2. In Vercel, **Add New → Project**, import this repo (keep the root directory) and set three
    environment variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 3. Deploy, then sign in with a demo account.
