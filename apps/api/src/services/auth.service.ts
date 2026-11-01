@@ -17,6 +17,14 @@ export interface AuthSession {
   user: Profile;
 }
 
+/** Supabase error codes that mean "the user typed something wrong" (never reveal which). */
+const CREDENTIAL_ERROR_CODES = new Set([
+  'invalid_credentials',
+  'email_not_confirmed',
+  'user_not_found',
+  'validation_failed',
+]);
+
 const INVALID_CREDENTIALS = new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
 const deactivated = () =>
   new AppError(
@@ -59,6 +67,19 @@ export const authService = {
   async login(email: string, password: string): Promise<AuthSession> {
     const { session, error } = await authRepository.signInWithPassword(email, password);
     if (error?.code === 'user_banned') throw deactivated();
+    if (error && !CREDENTIAL_ERROR_CODES.has(error.code ?? '')) {
+      // Not a user mistake: a bad Supabase key/URL, an outage, etc. Log the real reason and
+      // tell the user it is a service problem instead of blaming their password.
+      logger.error(
+        { code: error.code, status: error.status, message: error.message },
+        'Supabase sign-in failed',
+      );
+      throw new AppError(
+        503,
+        'INTERNAL_ERROR',
+        'Sign-in is temporarily unavailable. Please try again shortly.',
+      );
+    }
     if (error || !session) throw INVALID_CREDENTIALS;
 
     const profile = await profilesRepository.findById(supabaseAdmin, session.user.id);
