@@ -27,7 +27,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push --include-seed",
-    "test:integration": "npm --workspace apps/api run test:integration"
+    "test:integration": "npm --workspace apps/api run test:integration",
+    "db:bundle": "node scripts/bundle-sql.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
